@@ -5,4 +5,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: harbor.dataknife.net/library/dragonwilds-operator
-  newTag: latest
+  newTag: 73b1d9c
