@@ -20,21 +20,23 @@ import (
 	"context"
 	"fmt"
 
+	dragonwildsv1alpha1 "github.com/DataKnifeAI/dragonwilds-operator/api/v1alpha1"
+	"github.com/DataKnifeAI/dragonwilds-operator/internal/config"
+	"github.com/DataKnifeAI/dragonwilds-operator/internal/provisioner"
+	egv1a1 "github.com/envoyproxy/gateway/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-
-	dragonwildsv1alpha1 "github.com/DataKnifeAI/dragonwilds-operator/api/v1alpha1"
-	"github.com/DataKnifeAI/dragonwilds-operator/internal/config"
-	"github.com/DataKnifeAI/dragonwilds-operator/internal/gateway"
-	"github.com/DataKnifeAI/dragonwilds-operator/internal/provisioner"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
+	gatewayv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 )
 
 const finalizerName = "dragonwilds.dataknife.ai/finalizer"
@@ -43,6 +45,7 @@ const finalizerName = "dragonwilds.dataknife.ai/finalizer"
 type DragonwildsServerReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+	Kube   kubernetes.Interface
 }
 
 // +kubebuilder:rbac:groups=dragonwilds.dataknife.ai,resources=dragonwildsservers,verbs=get;list;watch;create;update;patch;delete
@@ -54,6 +57,12 @@ type DragonwildsServerReconciler struct {
 // +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
+// +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=pods/log,verbs=get
+// +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=gateways,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=udproutes,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=gatewayclasses,verbs=get;list;watch
+// +kubebuilder:rbac:groups=gateway.envoyproxy.io,resources=envoyproxies,verbs=get;list;watch;create;update;patch;delete
 
 func (r *DragonwildsServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := logf.FromContext(ctx)
@@ -153,7 +162,10 @@ func (r *DragonwildsServerReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, err
 	}
 
-	gw := gateway.Plan(server)
+	gw, err := r.reconcileGatewayStack(ctx, server)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 
 	ready := false
 	phase := dragonwildsv1alpha1.PhaseDeploying
@@ -166,11 +178,20 @@ func (r *DragonwildsServerReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			message = "game server Deployment is ready"
 		}
 	}
+	if gw.Message != "" {
+		if message == "reconciling child resources" || ready {
+			message = message + "; " + gw.Message
+		}
+	}
 
-	connAddr := server.Spec.Gateway.Address
+	connAddr := gw.Address
 	if !config.GatewayEnabled(server.Spec) {
 		connAddr = ""
-		message = message + "; gateway disabled — use Service/NodePort (see docs/CONNECT.md)"
+	}
+
+	obs := observedRuntime{}
+	if ready {
+		obs = r.observeRuntime(ctx, server)
 	}
 
 	_ = r.patchStatus(ctx, server, func(s *dragonwildsv1alpha1.DragonwildsServer) {
@@ -184,6 +205,21 @@ func (r *DragonwildsServerReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		s.Status.CredentialsGenerated = generated
 		s.Status.ImageVersion = config.ImageRef(server.Spec)
 		s.Status.WorldName = config.WorldName(server.Spec, server.Name)
+		if obs.BuildID != "" {
+			s.Status.RunningBuildId = obs.BuildID
+		}
+		if obs.WorldSaveGuid != "" {
+			if s.Status.WorldSaveGuid == "" {
+				s.Status.WorldSaveGuid = obs.WorldSaveGuid
+			} else if s.Status.WorldSaveGuid != obs.WorldSaveGuid {
+				s.Status.Phase = dragonwildsv1alpha1.PhaseFailed
+				s.Status.Ready = false
+				s.Status.Message = "world save GUID changed — refusing Ready (expected " + s.Status.WorldSaveGuid + ", got " + obs.WorldSaveGuid + ")"
+				phase = s.Status.Phase
+				ready = false
+				message = s.Status.Message
+			}
+		}
 		s.Status.ObservedGeneration = server.Generation
 
 		meta.SetStatusCondition(&s.Status.Conditions, metav1.Condition{
@@ -294,6 +330,21 @@ func (r *DragonwildsServerReconciler) applyObject(ctx context.Context, obj clien
 		cur := existing.(*corev1.PersistentVolumeClaim)
 		cur.Labels = desired.Labels
 		return r.Update(ctx, cur)
+	case *egv1a1.EnvoyProxy:
+		cur := existing.(*egv1a1.EnvoyProxy)
+		cur.Labels = desired.Labels
+		cur.Spec = desired.Spec
+		return r.Update(ctx, cur)
+	case *gatewayv1.Gateway:
+		cur := existing.(*gatewayv1.Gateway)
+		cur.Labels = desired.Labels
+		cur.Spec = desired.Spec
+		return r.Update(ctx, cur)
+	case *gatewayv1alpha2.UDPRoute:
+		cur := existing.(*gatewayv1alpha2.UDPRoute)
+		cur.Labels = desired.Labels
+		cur.Spec = desired.Spec
+		return r.Update(ctx, cur)
 	default:
 		return fmt.Errorf("unsupported apply type %T", obj)
 	}
@@ -331,6 +382,9 @@ func (r *DragonwildsServerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.ConfigMap{}).
 		Owns(&corev1.Secret{}).
 		Owns(&corev1.PersistentVolumeClaim{}).
+		Owns(&gatewayv1.Gateway{}).
+		Owns(&gatewayv1alpha2.UDPRoute{}).
+		Owns(&egv1a1.EnvoyProxy{}).
 		Named("dragonwildsserver").
 		Complete(r)
 }

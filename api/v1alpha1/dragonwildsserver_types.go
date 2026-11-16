@@ -63,6 +63,16 @@ type GatewayConfig struct {
 	// +optional
 	ClassName string `json:"className,omitempty"`
 
+	// GatewayName overrides the Gateway resource name.
+	// Default: {name}-gateway (strips a trailing "-server" suffix from name).
+	// +optional
+	GatewayName string `json:"gatewayName,omitempty"`
+
+	// EnvoyProxyName overrides the EnvoyProxy resource name.
+	// Default: game-{base}-kubevip.
+	// +optional
+	EnvoyProxyName string `json:"envoyProxyName,omitempty"`
+
 	// ServiceType overrides the backing Service type when gateway is disabled.
 	// +kubebuilder:validation:Enum=ClusterIP;NodePort;LoadBalancer
 	// +kubebuilder:default=ClusterIP
@@ -256,9 +266,18 @@ type DragonwildsServerStatus struct {
 	// +optional
 	ImageVersion string `json:"imageVersion,omitempty"`
 
+	// RunningBuildId is the game BuildId parsed from server session logs when Ready.
+	// +optional
+	RunningBuildId string `json:"runningBuildId,omitempty"`
+
 	// WorldName is the observed/recorded world name after first successful start.
 	// +optional
 	WorldName string `json:"worldName,omitempty"`
+
+	// WorldSaveGuid is recorded after first successful Ready so later recreates
+	// can detect accidental new-world creation (palworld DedicatedServerName analogue).
+	// +optional
+	WorldSaveGuid string `json:"worldSaveGuid,omitempty"`
 
 	// ObservedGeneration is the last reconciled generation.
 	// +optional

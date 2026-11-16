@@ -17,35 +17,53 @@ limitations under the License.
 package gateway
 
 import (
-	"strings"
 	"testing"
 
 	dragonwildsv1alpha1 "github.com/DataKnifeAI/dragonwilds-operator/api/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
-func TestPlanDisabled(t *testing.T) {
-	off := false
-	st := Plan(&dragonwildsv1alpha1.DragonwildsServer{
-		ObjectMeta: metav1.ObjectMeta{Name: "x"},
-		Spec:       dragonwildsv1alpha1.DragonwildsServerSpec{Gateway: dragonwildsv1alpha1.GatewayConfig{Enabled: &off}},
-	})
-	if !st.Configured {
-		t.Fatal("disabled gateway should report configured")
+func TestDeriveNames(t *testing.T) {
+	server := &dragonwildsv1alpha1.DragonwildsServer{
+		ObjectMeta: metav1.ObjectMeta{Name: "dragonwilds-test"},
+	}
+	names := DeriveNames(server)
+	if names.Gateway != "dragonwilds-test-gateway" {
+		t.Fatalf("gateway = %q", names.Gateway)
+	}
+	if names.EnvoyProxy != "game-dragonwilds-test-kubevip" {
+		t.Fatalf("envoyproxy = %q", names.EnvoyProxy)
+	}
+	if names.EnvoySvc != "dragonwilds-test-envoy" {
+		t.Fatalf("envoy svc = %q", names.EnvoySvc)
 	}
 }
 
-func TestPlanEnabledPending(t *testing.T) {
+func TestBuildGatewayListeners(t *testing.T) {
 	on := true
-	st := Plan(&dragonwildsv1alpha1.DragonwildsServer{
+	server := &dragonwildsv1alpha1.DragonwildsServer{
+		ObjectMeta: metav1.ObjectMeta{Name: "ashenfall", Namespace: "game-servers"},
 		Spec: dragonwildsv1alpha1.DragonwildsServerSpec{
-			Gateway: dragonwildsv1alpha1.GatewayConfig{Enabled: &on, Address: "203.0.113.10"},
+			OwnerId: "x",
+			Gateway: dragonwildsv1alpha1.GatewayConfig{Enabled: &on, Address: "192.168.14.188"},
 		},
-	})
-	if st.Configured {
-		t.Fatal("Phase 3 not implemented yet")
 	}
-	if !strings.Contains(st.Message, "Phase 3") {
-		t.Fatalf("message = %q", st.Message)
+	gw := BuildGateway(server)
+	if len(gw.Spec.Listeners) != 2 {
+		t.Fatalf("listeners = %d", len(gw.Spec.Listeners))
+	}
+	if gw.Spec.Listeners[0].Protocol != gatewayv1.UDPProtocolType {
+		t.Fatal("expected UDP listeners")
+	}
+	if gw.Spec.Addresses[0].Value != "192.168.14.188" {
+		t.Fatalf("address = %q", gw.Spec.Addresses[0].Value)
+	}
+}
+
+func TestMissingGatewayClassMessage(t *testing.T) {
+	msg := MissingGatewayClassMessage("envoy")
+	if msg == "" {
+		t.Fatal("empty message")
 	}
 }

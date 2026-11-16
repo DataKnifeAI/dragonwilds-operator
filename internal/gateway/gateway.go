@@ -14,44 +14,214 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package gateway will own Envoy Gateway + UDPRoute wiring (Phase 3).
+// Package gateway owns Envoy Gateway + UDPRoute wiring for DragonwildsServer.
 package gateway
 
 import (
+	"fmt"
+	"strings"
+
 	dragonwildsv1alpha1 "github.com/DataKnifeAI/dragonwilds-operator/api/v1alpha1"
 	"github.com/DataKnifeAI/dragonwilds-operator/internal/config"
+	egv1a1 "github.com/envoyproxy/gateway/api/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
+	gatewayv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 )
 
-// Status describes gateway reconcile outcome for status conditions.
-type Status struct {
-	Configured bool
-	Address    string
-	Message    string
+const (
+	ListenerGameUDP   = "game-udp"
+	ListenerBeaconUDP = "beacon-udp"
+	defaultClassName  = "envoy"
+)
+
+// Names holds derived Gateway resource names.
+type Names struct {
+	Gateway     string
+	EnvoyProxy  string
+	EnvoySvc    string
+	GameRoute   string
+	BeaconRoute string
 }
 
-// Plan returns the intended gateway posture without creating API objects yet.
-// Phase 3 will create Gateway / UDPRoute / EnvoyProxy resources here.
-func Plan(server *dragonwildsv1alpha1.DragonwildsServer) Status {
-	if !config.GatewayEnabled(server.Spec) {
-		return Status{
-			Configured: true,
-			Address:    "",
-			Message:    "gateway disabled; using Service only (set gateway.serviceType=NodePort for homelab)",
-		}
+// DeriveNames returns resource names for a server.
+func DeriveNames(server *dragonwildsv1alpha1.DragonwildsServer) Names {
+	base := strings.TrimSuffix(server.Name, "-server")
+	gwName := base + "-gateway"
+	if server.Spec.Gateway.GatewayName != "" {
+		gwName = server.Spec.Gateway.GatewayName
 	}
-	if server.Spec.Gateway.Address == "" {
-		return Status{
-			Configured: false,
-			Message:    "spec.gateway.address is required when gateway.enabled=true",
-		}
+	epName := "game-" + base + "-kubevip"
+	if server.Spec.Gateway.EnvoyProxyName != "" {
+		epName = server.Spec.Gateway.EnvoyProxyName
 	}
-	className := server.Spec.Gateway.ClassName
-	if className == "" {
-		className = "envoy"
+	return Names{
+		Gateway:     gwName,
+		EnvoyProxy:  epName,
+		EnvoySvc:    server.Name + "-envoy",
+		GameRoute:   base + "-game-udp",
+		BeaconRoute: base + "-beacon-udp",
 	}
-	return Status{
-		Configured: false,
-		Address:    server.Spec.Gateway.Address,
-		Message:    "Envoy Gateway UDPRoute wiring lands in Phase 3 (class=" + className + ")",
+}
+
+func className(spec dragonwildsv1alpha1.DragonwildsServerSpec) string {
+	if spec.Gateway.ClassName != "" {
+		return spec.Gateway.ClassName
 	}
+	return defaultClassName
+}
+
+func gatewayLabels(server *dragonwildsv1alpha1.DragonwildsServer) map[string]string {
+	return map[string]string{
+		"app.kubernetes.io/name":       "dragonwilds-server",
+		"app.kubernetes.io/instance":   server.Name,
+		"app.kubernetes.io/managed-by": "dragonwilds-operator",
+		"app.kubernetes.io/component":  "envoy-gateway",
+	}
+}
+
+func podSelector(server *dragonwildsv1alpha1.DragonwildsServer) map[string]string {
+	return map[string]string{
+		"app.kubernetes.io/name":       "dragonwilds-server",
+		"app.kubernetes.io/instance":   server.Name,
+		"app.kubernetes.io/managed-by": "dragonwilds-operator",
+		"app.kubernetes.io/component":  "game-server",
+	}
+}
+
+// BuildEnvoyBackendService is the ClusterIP Service UDPRoutes target.
+func BuildEnvoyBackendService(server *dragonwildsv1alpha1.DragonwildsServer) *corev1.Service {
+	names := DeriveNames(server)
+	gamePort := config.GamePort(server.Spec)
+	beaconPort := config.BeaconPort(server.Spec)
+	return &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      names.EnvoySvc,
+			Namespace: server.Namespace,
+			Labels:    gatewayLabels(server),
+		},
+		Spec: corev1.ServiceSpec{
+			Type:     corev1.ServiceTypeClusterIP,
+			Selector: podSelector(server),
+			Ports: []corev1.ServicePort{
+				{Name: "game", Protocol: corev1.ProtocolUDP, Port: gamePort, TargetPort: intstr.FromInt32(gamePort)},
+				{Name: "beacon", Protocol: corev1.ProtocolUDP, Port: beaconPort, TargetPort: intstr.FromInt32(beaconPort)},
+			},
+		},
+	}
+}
+
+// BuildEnvoyProxy pins the LoadBalancer VIP via Envoy Gateway infrastructure.
+func BuildEnvoyProxy(server *dragonwildsv1alpha1.DragonwildsServer) *egv1a1.EnvoyProxy {
+	names := DeriveNames(server)
+	return &egv1a1.EnvoyProxy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      names.EnvoyProxy,
+			Namespace: server.Namespace,
+			Labels:    gatewayLabels(server),
+		},
+		Spec: egv1a1.EnvoyProxySpec{
+			Logging: egv1a1.ProxyLogging{
+				Level: map[egv1a1.ProxyLogComponent]egv1a1.LogLevel{
+					egv1a1.LogComponentDefault: egv1a1.LogLevelWarn,
+				},
+			},
+			Provider: &egv1a1.EnvoyProxyProvider{
+				Type: egv1a1.ProviderTypeKubernetes,
+				Kubernetes: &egv1a1.EnvoyProxyKubernetesProvider{
+					EnvoyService: &egv1a1.KubernetesServiceSpec{
+						Type:           ptr.To(egv1a1.ServiceTypeLoadBalancer),
+						LoadBalancerIP: ptr.To(server.Spec.Gateway.Address),
+					},
+				},
+			},
+		},
+	}
+}
+
+// BuildGateway creates the Gateway with UDP listeners for game + beacon.
+func BuildGateway(server *dragonwildsv1alpha1.DragonwildsServer) *gatewayv1.Gateway {
+	names := DeriveNames(server)
+	sameNS := &gatewayv1.AllowedRoutes{
+		Namespaces: &gatewayv1.RouteNamespaces{From: ptr.To(gatewayv1.NamespacesFromSame)},
+	}
+	return &gatewayv1.Gateway{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      names.Gateway,
+			Namespace: server.Namespace,
+			Labels:    gatewayLabels(server),
+		},
+		Spec: gatewayv1.GatewaySpec{
+			GatewayClassName: gatewayv1.ObjectName(className(server.Spec)),
+			Addresses: []gatewayv1.GatewayAddress{
+				{Type: ptr.To(gatewayv1.IPAddressType), Value: server.Spec.Gateway.Address},
+			},
+			Infrastructure: &gatewayv1.GatewayInfrastructure{
+				ParametersRef: &gatewayv1.LocalParametersReference{
+					Group: gatewayv1.Group(egv1a1.GroupVersion.Group),
+					Kind:  gatewayv1.Kind("EnvoyProxy"),
+					Name:  names.EnvoyProxy,
+				},
+			},
+			Listeners: []gatewayv1.Listener{
+				{
+					Name:          gatewayv1.SectionName(ListenerGameUDP),
+					Port:          gatewayv1.PortNumber(config.GamePort(server.Spec)),
+					Protocol:      gatewayv1.UDPProtocolType,
+					AllowedRoutes: sameNS,
+				},
+				{
+					Name:          gatewayv1.SectionName(ListenerBeaconUDP),
+					Port:          gatewayv1.PortNumber(config.BeaconPort(server.Spec)),
+					Protocol:      gatewayv1.UDPProtocolType,
+					AllowedRoutes: sameNS,
+				},
+			},
+		},
+	}
+}
+
+// BuildUDPRoute routes one listener to the envoy backend Service.
+func BuildUDPRoute(server *dragonwildsv1alpha1.DragonwildsServer, routeName, listenerName string, port int32) *gatewayv1alpha2.UDPRoute {
+	names := DeriveNames(server)
+	return &gatewayv1alpha2.UDPRoute{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      routeName,
+			Namespace: server.Namespace,
+			Labels:    gatewayLabels(server),
+		},
+		Spec: gatewayv1alpha2.UDPRouteSpec{
+			CommonRouteSpec: gatewayv1.CommonRouteSpec{
+				ParentRefs: []gatewayv1.ParentReference{{
+					Name:        gatewayv1.ObjectName(names.Gateway),
+					Namespace:   ptr.To(gatewayv1.Namespace(server.Namespace)),
+					SectionName: ptr.To(gatewayv1.SectionName(listenerName)),
+				}},
+			},
+			Rules: []gatewayv1alpha2.UDPRouteRule{{
+				BackendRefs: []gatewayv1alpha2.BackendRef{{
+					BackendObjectReference: gatewayv1.BackendObjectReference{
+						Name: gatewayv1.ObjectName(names.EnvoySvc),
+						Port: ptr.To(gatewayv1.PortNumber(port)),
+					},
+				}},
+			}},
+		},
+	}
+}
+
+// ConnectionAddress returns the preferred client-facing IP.
+func ConnectionAddress(server *dragonwildsv1alpha1.DragonwildsServer, gw *gatewayv1.Gateway) string {
+	if gw != nil && len(gw.Status.Addresses) > 0 {
+		return gw.Status.Addresses[0].Value
+	}
+	return server.Spec.Gateway.Address
+}
+
+// MissingGatewayClassMessage explains a missing GatewayClass.
+func MissingGatewayClassMessage(class string) string {
+	return fmt.Sprintf("GatewayClass %q not found or not Accepted — install Envoy Gateway", class)
 }

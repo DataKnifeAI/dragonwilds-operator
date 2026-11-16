@@ -13,6 +13,19 @@ kubectl get secret ashenfall-home-secrets -o jsonpath='{.data.world-password}' |
 kubectl get secret ashenfall-home-secrets -o jsonpath='{.data.admin-password}' | base64 -d; echo
 ```
 
+## Envoy Gateway (recommended — palworld parity)
+
+```yaml
+spec:
+  gateway:
+    enabled: true
+    className: envoy
+    address: "192.168.14.188"   # dedicated VIP (Kube-VIP / MetalLB)
+```
+
+Clients use `status.connectionAddress:7777` (beacon `8888`). Host and container ports match
+the official image requirement.
+
 ## Homelab without Gateway
 
 ```yaml

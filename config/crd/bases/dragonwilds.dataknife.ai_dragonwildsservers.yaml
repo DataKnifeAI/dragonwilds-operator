@@ -130,6 +130,16 @@ spec:
                       Enabled creates Gateway / UDPRoute resources (Envoy Gateway pattern).
                       When false, use the Service (ClusterIP or NodePort annotations) only.
                     type: boolean
+                  envoyProxyName:
+                    description: |-
+                      EnvoyProxyName overrides the EnvoyProxy resource name.
+                      Default: game-{base}-kubevip.
+                    type: string
+                  gatewayName:
+                    description: |-
+                      GatewayName overrides the Gateway resource name.
+                      Default: {name}-gateway (strips a trailing "-server" suffix from name).
+                    type: string
                   serviceType:
                     default: ClusterIP
                     description: ServiceType overrides the backing Service type when
@@ -407,9 +417,18 @@ spec:
               ready:
                 description: Ready is true when the game server Deployment is available.
                 type: boolean
+              runningBuildId:
+                description: RunningBuildId is the game BuildId parsed from server
+                  session logs when Ready.
+                type: string
               worldName:
                 description: WorldName is the observed/recorded world name after first
                   successful start.
+                type: string
+              worldSaveGuid:
+                description: |-
+                  WorldSaveGuid is recorded after first successful Ready so later recreates
+                  can detect accidental new-world creation (palworld DedicatedServerName analogue).
                 type: string
             type: object
         type: object

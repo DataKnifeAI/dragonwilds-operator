@@ -9,11 +9,12 @@ DragonwildsServer (CR)
 ├── PVC             ({name}-data)             /home/steam/rsdw-dedicated
 ├── Deployment      ({name})                  Recreate, official image
 ├── Service         ({name})                  UDP game + beacon
-└── Gateway*        (Phase 3)                 Envoy Gateway + UDPRoute → players
+├── Service         ({name}-envoy)            ClusterIP backend for UDPRoutes
+└── Gateway         EnvoyProxy + UDPRoutes    VIP → game 7777 / beacon 8888
 ```
 
-\* Gateway / UDPRoute wiring is planned; today set `gateway.enabled: false` and use
-`gateway.serviceType: NodePort` (or LoadBalancer) for connectivity.
+When `gateway.enabled: false`, skip Gateway/EnvoyProxy/UDPRoutes and expose via
+`gateway.serviceType` (NodePort / LoadBalancer / ClusterIP).
 
 ## Design rules
 

@@ -10,3 +10,6 @@
 - Docker Compose path under `compose/` (`docs/LOCAL.md`).
 - Docs: ARCHITECTURE, GAME_SERVER, CONNECT, LOCAL, FAQ, GITLAB_MIRROR.
 - GitHub → GitLab mirror + Harbor publish (`harbor.dataknife.net/library/dragonwilds-operator`).
+- Envoy Gateway parity with palworld-operator: EnvoyProxy + Gateway + UDPRoutes (game/beacon), dedicated VIP, GatewayClass detection.
+- Status: `worldSaveGuid`, `runningBuildId` from pod logs; Ready fails if save GUID drifts.
+- Hero graphic in README.

@@ -1,0 +1,41 @@
+# Test deploy for prd-apps game-servers namespace (Envoy Gateway VIP).
+# Set ownerId, then: kubectl apply -f config/samples/prd-apps-test.yaml
+apiVersion: dragonwilds.dataknife.ai/v1alpha1
+kind: DragonwildsServer
+metadata:
+  name: dragonwilds-test
+  namespace: game-servers
+  labels:
+    app.kubernetes.io/name: dragonwilds-server
+    app.kubernetes.io/instance: dragonwilds-test
+spec:
+  ownerId: "REPLACE_WITH_PLAYER_ID"
+  serverName: "DataKnife Dragonwilds"
+  worldName: "Ashenfall Test"
+  players: 4
+  gamePort: 7777
+
+  generateSecrets: true
+  allowEmptyWorldPassword: true
+
+  image: ghcr.io/runescape/rsdw-dedicated
+  imagePullPolicy: IfNotPresent
+
+  update:
+    autoUpdateImage: false
+    validateOnStart: false
+
+  gateway:
+    enabled: true
+    className: envoy
+    address: "192.168.14.188"
+
+  persistence:
+    size: 20Gi
+    storageClassName: truenas-csi-nfs
+
+  nodeSelector:
+    kubernetes.io/arch: amd64
+    kubernetes.io/os: linux
+
+  terminationGracePeriodSeconds: 60
