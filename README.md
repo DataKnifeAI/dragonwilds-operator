@@ -15,6 +15,7 @@ One custom resource (`DragonwildsServer`) reconciles Deployment, PVC, ConfigMap,
 
 Modeled on [palworld-operator](https://github.com/DataKnifeAI/palworld-operator) (“World Keeper”).
 
+**Site:** [dataknifeai.github.io/dragonwilds-operator](https://dataknifeai.github.io/dragonwilds-operator/)  
 **Repos:** [GitHub](https://github.com/DataKnifeAI/dragonwilds-operator) · [GitLab mirror](https://gitlab.com/dk-raas/dkai/game-servers/dragonwilds-operator)  
 **Operator image:** `harbor.dataknife.net/library/dragonwilds-operator` (see [docs/GITLAB_MIRROR.md](docs/GITLAB_MIRROR.md))
 
