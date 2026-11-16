@@ -4,6 +4,12 @@
   <img src="docs/assets/hero-dragonwilds-operator.jpg" alt="Dragonwilds Operator — Ashenfall world keeper" width="640">
 </p>
 
+<p align="center">
+  <a href="https://github.com/DataKnifeAI/dragonwilds-operator/actions/workflows/test.yml"><img src="https://github.com/DataKnifeAI/dragonwilds-operator/actions/workflows/test.yml/badge.svg" alt="Test"></a>
+  <a href="https://github.com/DataKnifeAI/dragonwilds-operator/actions/workflows/lint.yml"><img src="https://github.com/DataKnifeAI/dragonwilds-operator/actions/workflows/lint.yml/badge.svg" alt="Lint"></a>
+  <a href="https://github.com/DataKnifeAI/dragonwilds-operator/actions/workflows/build.yml"><img src="https://github.com/DataKnifeAI/dragonwilds-operator/actions/workflows/build.yml/badge.svg" alt="Build"></a>
+</p>
+
 Kubernetes operator for [RuneScape: Dragonwilds](https://www.runescape.com/dragonwilds) dedicated servers.
 One custom resource (`DragonwildsServer`) reconciles Deployment, PVC, ConfigMap, Secret, and Service around Jagex’s official image [`ghcr.io/runescape/rsdw-dedicated`](https://github.com/runescape/rsdw-dedicated).
 
@@ -23,6 +29,9 @@ kubectl apply -f config/samples/dragonwilds_v1alpha1_dragonwildsserver.yaml
 # edit ownerId first!
 ```
 
+Homelab exposure: `gateway.enabled: false`, `serviceType: LoadBalancer`, set `gateway.address`
+to a kube-vip VIP, then Direct Connect to `status.connectionAddress:7777`.
+
 ## Quick start (no cluster)
 
 See [docs/LOCAL.md](docs/LOCAL.md) — Docker Compose with the same official image.
@@ -33,7 +42,9 @@ See [docs/LOCAL.md](docs/LOCAL.md) — Docker Compose with the same official ima
 |-----|--------|
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Resource graph & design rules |
 | [GAME_SERVER.md](docs/GAME_SERVER.md) | Ports, env, ini, saves, updates |
-| [CONNECT.md](docs/CONNECT.md) | Join / passwords / NodePort |
+| [CONNECT.md](docs/CONNECT.md) | Join / VIP / Recent vs Direct |
+| [BACKUP.md](docs/BACKUP.md) | Optional CronJob backups |
+| [METRICS.md](docs/METRICS.md) | Prometheus ServiceMonitor |
 | [LOCAL.md](docs/LOCAL.md) | Compose path |
 | [FAQ.md](docs/FAQ.md) | Common footguns |
 | [TASKS.md](TASKS.md) | Phased roadmap |

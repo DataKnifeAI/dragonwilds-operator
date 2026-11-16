@@ -24,6 +24,7 @@ import (
 	"github.com/DataKnifeAI/dragonwilds-operator/internal/config"
 	"github.com/DataKnifeAI/dragonwilds-operator/internal/gateway"
 	egv1a1 "github.com/envoyproxy/gateway/api/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -47,9 +48,15 @@ func (r *DragonwildsServerReconciler) reconcileGatewayStack(
 
 	if !config.GatewayEnabled(server.Spec) {
 		_ = r.deleteOwnedGatewayStack(ctx, server, names)
+		msg := "gateway disabled; using Service only (set gateway.serviceType=NodePort|LoadBalancer)"
+		addr := server.Spec.Gateway.Address
+		if server.Spec.Gateway.ServiceType == corev1.ServiceTypeLoadBalancer && addr != "" {
+			msg = fmt.Sprintf("gateway disabled; Service LoadBalancer VIP %s (UDP %d/%d)", addr, config.GamePort(server.Spec), config.BeaconPort(server.Spec))
+		}
 		return gatewayResult{
 			Configured: true,
-			Message:    "gateway disabled; using Service only (set gateway.serviceType=NodePort for homelab)",
+			Address:    addr,
+			Message:    msg,
 		}, nil
 	}
 

@@ -135,6 +135,10 @@ func BuildEnvoyProxy(server *dragonwildsv1alpha1.DragonwildsServer) *egv1a1.Envo
 					EnvoyService: &egv1a1.KubernetesServiceSpec{
 						Type:           ptr.To(egv1a1.ServiceTypeLoadBalancer),
 						LoadBalancerIP: ptr.To(server.Spec.Gateway.Address),
+						// Match palworld-operator: Cluster avoids silent UDP drops when
+						// traffic lands on a node without a local Envoy endpoint (API
+						// default is Local).
+						ExternalTrafficPolicy: ptr.To(egv1a1.ServiceExternalTrafficPolicyCluster),
 					},
 				},
 			},

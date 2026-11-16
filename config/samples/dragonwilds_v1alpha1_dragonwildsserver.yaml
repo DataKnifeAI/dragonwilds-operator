@@ -20,19 +20,28 @@ spec:
 
   image: ghcr.io/runescape/rsdw-dedicated
   # Prefer pinning a digest after first successful pull:
-  # imageTag: ""
+  # image: ghcr.io/runescape/rsdw-dedicated@sha256:…
 
   update:
     autoUpdateImage: false
     validateOnStart: false
 
-  # Phase 3 will wire Envoy Gateway UDPRoutes. For now, disable and use NodePort:
+  # Recommended: direct kube-vip LoadBalancer (Envoy UDP breaks Dragonwilds joins).
   gateway:
     enabled: false
-    serviceType: NodePort
+    serviceType: LoadBalancer
+    address: "203.0.113.10"
+    # NodePort escape hatch:
+    # serviceType: NodePort
+    # Experimental Envoy Gateway:
     # enabled: true
     # className: envoy
-    # address: "203.0.113.10"
+
+  backup:
+    enabled: false
+    # enabled: true
+    # schedule: "0 4 * * *"
+    # retain: 7
 
   persistence:
     size: 20Gi

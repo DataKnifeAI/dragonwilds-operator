@@ -47,13 +47,16 @@ const (
 // GatewayConfig configures exposure for Dragonwilds game traffic.
 type GatewayConfig struct {
 	// Enabled creates Gateway / UDPRoute resources (Envoy Gateway pattern).
-	// When false, use the Service (ClusterIP or NodePort annotations) only.
-	// +kubebuilder:default=true
+	// Default false — Dragonwilds (Unreal) joins fail behind Envoy's UDP proxy
+	// because the game sees the Envoy pod IP. Prefer serviceType=LoadBalancer
+	// with address set to a kube-vip VIP instead.
+	// +kubebuilder:default=false
 	// +optional
 	Enabled *bool `json:"enabled,omitempty"`
 
-	// Address is the dedicated external IP for this server (Kube-VIP / MetalLB).
-	// Required when enabled is true.
+	// Address is the dedicated external IP (Kube-VIP / MetalLB).
+	// Required when enabled is true; also used as LoadBalancerIP when
+	// enabled is false and serviceType is LoadBalancer.
 	// +optional
 	// +kubebuilder:validation:Pattern=`^$|^([0-9]{1,3}\.){3}[0-9]{1,3}$`
 	Address string `json:"address,omitempty"`
@@ -111,6 +114,38 @@ type PersistenceConfig struct {
 	// +kubebuilder:default="/home/steam/rsdw-dedicated"
 	// +optional
 	MountPath string `json:"mountPath,omitempty"`
+}
+
+// BackupConfig configures scheduled tar backups of the data PVC.
+type BackupConfig struct {
+	// Enabled creates a backup PVC + CronJob. Default false.
+	// +optional
+	Enabled bool `json:"enabled,omitempty"`
+
+	// Schedule is a Cron expression (UTC). Default "0 4 * * *" (04:00 daily).
+	// +kubebuilder:default="0 4 * * *"
+	// +optional
+	Schedule string `json:"schedule,omitempty"`
+
+	// Retain is how many compressed archives to keep. Default 7.
+	// +kubebuilder:default=7
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=90
+	// +optional
+	Retain int32 `json:"retain,omitempty"`
+
+	// Size is the backup PVC capacity. Default matches persistence size.
+	// +optional
+	Size string `json:"size,omitempty"`
+
+	// StorageClassName for the backup PVC. Empty inherits persistence.storageClassName.
+	// +optional
+	StorageClassName string `json:"storageClassName,omitempty"`
+
+	// Image is the backup job container image. Default busybox:1.36.
+	// +kubebuilder:default="busybox:1.36"
+	// +optional
+	Image string `json:"image,omitempty"`
 }
 
 // DragonwildsServerSpec defines the desired state of a Dragonwilds dedicated server.
@@ -210,6 +245,11 @@ type DragonwildsServerSpec struct {
 	// Persistence configures the PVC mounted at the official data path.
 	// +optional
 	Persistence PersistenceConfig `json:"persistence,omitempty"`
+
+	// Backup configures an optional CronJob that tars the data PVC into a
+	// separate backup PVC (retain N archives).
+	// +optional
+	Backup BackupConfig `json:"backup,omitempty"`
 
 	// Resources overrides auto-selected CPU/memory.
 	// +optional

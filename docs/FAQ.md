@@ -17,7 +17,17 @@ Expected. Stop the server, edit, then start. The operator only applies config at
 ## Server shows in the list but “connection lost”
 
 Usually UDP port forwarding: both **game** and **beacon** ports must reach the host.
-On the same LAN, Direct Connect to the LAN IP on the game port.
+On the same LAN, Direct Connect to the LAN VIP/IP on the game port.
+
+Recent / Public browser uses the **WAN IP EOS advertises**, not your kube-vip.
+Without router port-forward (+ hairpin), those joins fail even when Direct works.
+See [CONNECT.md](CONNECT.md).
+
+## Why not Envoy Gateway like Palworld?
+
+Envoy’s UDP proxy makes the game see the Envoy pod IP. Dragonwilds (Unreal) then
+fails the join handshake. Use `gateway.enabled: false` + `serviceType: LoadBalancer`
++ `address` instead.
 
 ## Client can’t see the server after a game patch
 
@@ -28,4 +38,5 @@ See [GAME_SERVER.md](GAME_SERVER.md).
 ## I deleted the CR and the world is gone
 
 If the StorageClass reclaim policy is Delete, removing the PVC destroys data.
-Back up `*.sav` before deleting CRs in non-lab clusters. Prefer Retain for production.
+Enable `spec.backup` (see [BACKUP.md](BACKUP.md)) and/or copy `*.sav` before deleting
+CRs in non-lab clusters. Prefer Retain for production.

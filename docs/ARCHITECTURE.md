@@ -8,13 +8,16 @@ DragonwildsServer (CR)
 ├── ConfigMap       ({name}-config)           DedicatedServer.ini (hash-annotated)
 ├── PVC             ({name}-data)             /home/steam/rsdw-dedicated
 ├── Deployment      ({name})                  Recreate, official image
-├── Service         ({name})                  UDP game + beacon
-├── Service         ({name}-envoy)            ClusterIP backend for UDPRoutes
-└── Gateway         EnvoyProxy + UDPRoutes    VIP → game 7777 / beacon 8888
+├── Service         ({name})                  UDP game + beacon (LoadBalancer VIP recommended)
+├── PVC             ({name}-backups)          optional tar archives (backup.enabled)
+├── CronJob         ({name}-backup)           optional scheduled backup
+├── Service         ({name}-envoy)            ClusterIP backend for UDPRoutes (Envoy only)
+└── Gateway         EnvoyProxy + UDPRoutes    optional — not recommended for Dragonwilds
 ```
 
-When `gateway.enabled: false`, skip Gateway/EnvoyProxy/UDPRoutes and expose via
-`gateway.serviceType` (NodePort / LoadBalancer / ClusterIP).
+Default exposure: `gateway.enabled: false` + `serviceType: LoadBalancer` + `address`
+(kube-vip VIP). Envoy UDP proxy rewrites client source IPs and breaks Unreal joins;
+keep Gateway wiring for experiments / parity with other game operators only.
 
 ## Design rules
 

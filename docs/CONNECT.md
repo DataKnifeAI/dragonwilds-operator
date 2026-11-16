@@ -13,20 +13,36 @@ kubectl get secret ashenfall-home-secrets -o jsonpath='{.data.world-password}' |
 kubectl get secret ashenfall-home-secrets -o jsonpath='{.data.admin-password}' | base64 -d; echo
 ```
 
-## Envoy Gateway (recommended — palworld parity)
+## LoadBalancer VIP (recommended for Dragonwilds)
+
+Dragonwilds (Unreal) expects a direct UDP path to the game pod. Envoy’s UDP proxy
+rewrites the client source to the Envoy pod IP and joins fail with “network connection
+failed”. Prefer a kube-vip LoadBalancer on the game Service:
 
 ```yaml
 spec:
   gateway:
-    enabled: true
-    className: envoy
+    enabled: false
+    serviceType: LoadBalancer
     address: "192.168.14.188"   # dedicated VIP (Kube-VIP / MetalLB)
 ```
 
 Clients use `status.connectionAddress:7777` (beacon `8888`). Host and container ports match
 the official image requirement.
 
-## Homelab without Gateway
+## Envoy Gateway
+
+```yaml
+spec:
+  gateway:
+    enabled: true
+    className: envoy
+    address: "192.168.14.188"
+```
+
+Works for some UDP games (e.g. Palworld) but is **not** reliable for Dragonwilds joins.
+
+## Homelab NodePort
 
 ```yaml
 spec:

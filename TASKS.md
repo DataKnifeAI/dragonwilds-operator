@@ -18,21 +18,22 @@
 - [x] Status worldSaveGuid / runningBuildId from pod logs
 - [x] KinD/cluster: apply sample → connect → world on PVC
 
-## Phase 3 — Exposure (palworld parity)
+## Phase 3 — Exposure
 
-- [x] Envoy Gateway + UDPRoute + EnvoyProxy wiring
+- [x] Envoy Gateway + UDPRoute + EnvoyProxy wiring (optional / experimental)
 - [x] Detect missing GatewayClass → clear condition
-- [x] NodePort escape hatch when `gateway.enabled: false`
+- [x] Recommended path: LoadBalancer VIP (`gateway.enabled: false`) — Envoy breaks Unreal joins
+- [x] NodePort escape hatch
 
 ## Phase 4 — Ops
 
-- [ ] Optional backup CronJob
+- [x] Optional backup CronJob + backup PVC
 - [x] Controller metrics endpoint (Kubebuilder default)
-- [ ] ServiceMonitor polish / scrape docs
-- [ ] Image digests / SBOM-ready publish (GHCR later)
+- [x] ServiceMonitor polish / scrape docs (`docs/METRICS.md`)
+- [ ] Image digests / SBOM-ready publish (GHCR — optional later)
 
 ## Phase 5 — Launch
 
 - [x] README + hero graphic
-- [ ] CI badges
-- [ ] v0.1.0 tag
+- [x] CI badges
+- [x] v0.1.0 tag

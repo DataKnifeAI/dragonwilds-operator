@@ -25,6 +25,7 @@ import (
 	"github.com/DataKnifeAI/dragonwilds-operator/internal/provisioner"
 	egv1a1 "github.com/envoyproxy/gateway/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -56,6 +57,7 @@ type DragonwildsServerReconciler struct {
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=batch,resources=cronjobs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=pods/log,verbs=get
@@ -167,6 +169,10 @@ func (r *DragonwildsServerReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, err
 	}
 
+	if err := r.reconcileBackup(ctx, server); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	ready := false
 	phase := dragonwildsv1alpha1.PhaseDeploying
 	message := "reconciling child resources"
@@ -186,7 +192,8 @@ func (r *DragonwildsServerReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	connAddr := gw.Address
 	if !config.GatewayEnabled(server.Spec) {
-		connAddr = ""
+		// Direct Service exposure (NodePort / LoadBalancer VIP).
+		connAddr = server.Spec.Gateway.Address
 	}
 
 	obs := observedRuntime{}
@@ -318,6 +325,12 @@ func (r *DragonwildsServerReconciler) applyObject(ctx context.Context, obj clien
 		cur.Spec.Type = desired.Spec.Type
 		cur.Spec.Ports = desired.Spec.Ports
 		cur.Spec.Selector = desired.Spec.Selector
+		cur.Spec.LoadBalancerIP = desired.Spec.LoadBalancerIP
+		cur.Spec.ExternalTrafficPolicy = desired.Spec.ExternalTrafficPolicy
+		// Local→Cluster updates must drop healthCheckNodePort or the API rejects the change.
+		if desired.Spec.ExternalTrafficPolicy != corev1.ServiceExternalTrafficPolicyLocal {
+			cur.Spec.HealthCheckNodePort = 0
+		}
 		cur.Labels = desired.Labels
 		return r.Update(ctx, cur)
 	case *appsv1.Deployment:
@@ -332,6 +345,11 @@ func (r *DragonwildsServerReconciler) applyObject(ctx context.Context, obj clien
 		return r.Update(ctx, cur)
 	case *egv1a1.EnvoyProxy:
 		cur := existing.(*egv1a1.EnvoyProxy)
+		cur.Labels = desired.Labels
+		cur.Spec = desired.Spec
+		return r.Update(ctx, cur)
+	case *batchv1.CronJob:
+		cur := existing.(*batchv1.CronJob)
 		cur.Labels = desired.Labels
 		cur.Spec = desired.Spec
 		return r.Update(ctx, cur)
@@ -373,6 +391,34 @@ func readyReason(ready bool) string {
 	return "DeploymentNotReady"
 }
 
+func (r *DragonwildsServerReconciler) reconcileBackup(ctx context.Context, server *dragonwildsv1alpha1.DragonwildsServer) error {
+	if !server.Spec.Backup.Enabled {
+		cj := &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{
+			Name:      provisioner.BackupCronJobNameFor(server),
+			Namespace: server.Namespace,
+		}}
+		if err := r.Delete(ctx, cj); err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+		// Keep backup PVC when disabled so archives are not wiped by a toggle.
+		return nil
+	}
+
+	bpvc := provisioner.BuildBackupPVC(server)
+	if err := controllerutil.SetControllerReference(server, bpvc, r.Scheme); err != nil {
+		return err
+	}
+	if err := r.applyObject(ctx, bpvc); err != nil {
+		return err
+	}
+
+	cj := provisioner.BuildBackupCronJob(server)
+	if err := controllerutil.SetControllerReference(server, cj, r.Scheme); err != nil {
+		return err
+	}
+	return r.applyObject(ctx, cj)
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *DragonwildsServerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
@@ -382,6 +428,7 @@ func (r *DragonwildsServerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.ConfigMap{}).
 		Owns(&corev1.Secret{}).
 		Owns(&corev1.PersistentVolumeClaim{}).
+		Owns(&batchv1.CronJob{}).
 		Owns(&gatewayv1.Gateway{}).
 		Owns(&gatewayv1alpha2.UDPRoute{}).
 		Owns(&egv1a1.EnvoyProxy{}).

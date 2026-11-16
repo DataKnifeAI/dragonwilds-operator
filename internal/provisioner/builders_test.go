@@ -74,6 +74,42 @@ func TestBuildServiceNodePort(t *testing.T) {
 	}
 }
 
+func TestBuildServiceLoadBalancerVIP(t *testing.T) {
+	gw := false
+	server := sampleServer()
+	server.Spec.Gateway = dragonwildsv1alpha1.GatewayConfig{
+		Enabled:     &gw,
+		ServiceType: corev1.ServiceTypeLoadBalancer,
+		Address:     "192.168.14.188",
+	}
+	svc := BuildService(server)
+	if svc.Spec.Type != corev1.ServiceTypeLoadBalancer {
+		t.Fatalf("type = %s", svc.Spec.Type)
+	}
+	if svc.Spec.LoadBalancerIP != "192.168.14.188" {
+		t.Fatalf("loadBalancerIP = %q", svc.Spec.LoadBalancerIP)
+	}
+	if svc.Spec.ExternalTrafficPolicy != corev1.ServiceExternalTrafficPolicyCluster {
+		t.Fatalf("etp = %s", svc.Spec.ExternalTrafficPolicy)
+	}
+}
+
+func TestBuildBackupCronJob(t *testing.T) {
+	server := sampleServer()
+	server.Spec.Backup = dragonwildsv1alpha1.BackupConfig{Enabled: true, Retain: 3}
+	cj := BuildBackupCronJob(server)
+	if cj.Name != "ashenfall-home-backup" {
+		t.Fatalf("name = %q", cj.Name)
+	}
+	if cj.Spec.Schedule == "" {
+		t.Fatal("empty schedule")
+	}
+	pvc := BuildBackupPVC(server)
+	if pvc.Name != "ashenfall-home-backups" {
+		t.Fatalf("pvc = %q", pvc.Name)
+	}
+}
+
 func TestDesiredSecret(t *testing.T) {
 	server := sampleServer()
 	sec, err := DesiredSecret(server, nil)

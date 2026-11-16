@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	dragonwildsv1alpha1 "github.com/DataKnifeAI/dragonwilds-operator/api/v1alpha1"
+	egv1a1 "github.com/envoyproxy/gateway/api/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
@@ -58,6 +59,22 @@ func TestBuildGatewayListeners(t *testing.T) {
 	}
 	if gw.Spec.Addresses[0].Value != "192.168.14.188" {
 		t.Fatalf("address = %q", gw.Spec.Addresses[0].Value)
+	}
+}
+
+func TestBuildEnvoyProxyUsesClusterETP(t *testing.T) {
+	on := true
+	server := &dragonwildsv1alpha1.DragonwildsServer{
+		ObjectMeta: metav1.ObjectMeta{Name: "dragonwilds-test", Namespace: "game-servers"},
+		Spec: dragonwildsv1alpha1.DragonwildsServerSpec{
+			OwnerId: "x",
+			Gateway: dragonwildsv1alpha1.GatewayConfig{Enabled: &on, Address: "192.168.14.188"},
+		},
+	}
+	ep := BuildEnvoyProxy(server)
+	svc := ep.Spec.Provider.Kubernetes.EnvoyService
+	if svc.ExternalTrafficPolicy == nil || *svc.ExternalTrafficPolicy != egv1a1.ServiceExternalTrafficPolicyCluster {
+		t.Fatalf("externalTrafficPolicy = %v, want Cluster", svc.ExternalTrafficPolicy)
 	}
 }
 

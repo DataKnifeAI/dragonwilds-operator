@@ -72,6 +72,10 @@ func BuildPVC(server *dragonwildsv1alpha1.DragonwildsServer) *corev1.PersistentV
 }
 
 // BuildService exposes game + beacon UDP ports.
+//
+// When Envoy Gateway is disabled, ServiceType/Address pin exposure. Dragonwilds
+// (Unreal) breaks behind Envoy's UDP proxy because joins appear to come from the
+// Envoy pod IP — prefer LoadBalancer+VIP (or NodePort) straight to the game pod.
 func BuildService(server *dragonwildsv1alpha1.DragonwildsServer) *corev1.Service {
 	gamePort := config.GamePort(server.Spec)
 	beaconPort := config.BeaconPort(server.Spec)
@@ -80,30 +84,40 @@ func BuildService(server *dragonwildsv1alpha1.DragonwildsServer) *corev1.Service
 		svcType = server.Spec.Gateway.ServiceType
 	}
 
+	spec := corev1.ServiceSpec{
+		Type:     svcType,
+		Selector: labelsFor(server),
+		Ports: []corev1.ServicePort{
+			{
+				Name:       "game",
+				Protocol:   corev1.ProtocolUDP,
+				Port:       gamePort,
+				TargetPort: intstr.FromInt32(gamePort),
+			},
+			{
+				Name:       "beacon",
+				Protocol:   corev1.ProtocolUDP,
+				Port:       beaconPort,
+				TargetPort: intstr.FromInt32(beaconPort),
+			},
+		},
+	}
+	if !config.GatewayEnabled(server.Spec) && svcType == corev1.ServiceTypeLoadBalancer {
+		if addr := server.Spec.Gateway.Address; addr != "" {
+			spec.LoadBalancerIP = addr
+		}
+		// Cluster: kube-vip may park the VIP on a node without the game pod.
+		// Local would silently drop UDP there (VIP ping still works).
+		spec.ExternalTrafficPolicy = corev1.ServiceExternalTrafficPolicyCluster
+	}
+
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName(server),
 			Namespace: server.Namespace,
 			Labels:    labelsFor(server),
 		},
-		Spec: corev1.ServiceSpec{
-			Type:     svcType,
-			Selector: labelsFor(server),
-			Ports: []corev1.ServicePort{
-				{
-					Name:       "game",
-					Protocol:   corev1.ProtocolUDP,
-					Port:       gamePort,
-					TargetPort: intstr.FromInt32(gamePort),
-				},
-				{
-					Name:       "beacon",
-					Protocol:   corev1.ProtocolUDP,
-					Port:       beaconPort,
-					TargetPort: intstr.FromInt32(beaconPort),
-				},
-			},
-		},
+		Spec: spec,
 	}
 }
 

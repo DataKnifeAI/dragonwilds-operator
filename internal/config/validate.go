@@ -41,12 +41,15 @@ func ValidateSpec(spec dragonwildsv1alpha1.DragonwildsServerSpec) error {
 	if gatewayEnabled(spec) && strings.TrimSpace(spec.Gateway.Address) == "" {
 		return fmt.Errorf("spec.gateway.address is required when gateway is enabled")
 	}
+	if !gatewayEnabled(spec) && spec.Gateway.ServiceType == "LoadBalancer" && strings.TrimSpace(spec.Gateway.Address) == "" {
+		return fmt.Errorf("spec.gateway.address is required when serviceType is LoadBalancer")
+	}
 	return nil
 }
 
 func gatewayEnabled(spec dragonwildsv1alpha1.DragonwildsServerSpec) bool {
 	if spec.Gateway.Enabled == nil {
-		return true
+		return false
 	}
 	return *spec.Gateway.Enabled
 }
@@ -140,4 +143,50 @@ func GraceSeconds(spec dragonwildsv1alpha1.DragonwildsServerSpec) int64 {
 // GatewayEnabled reports whether Envoy Gateway resources should be reconciled.
 func GatewayEnabled(spec dragonwildsv1alpha1.DragonwildsServerSpec) bool {
 	return gatewayEnabled(spec)
+}
+
+const (
+	DefaultBackupSchedule = "0 4 * * *"
+	DefaultBackupRetain   = int32(7)
+	DefaultBackupImage    = "busybox:1.36"
+)
+
+// BackupSchedule returns the Cron schedule for world backups.
+func BackupSchedule(spec dragonwildsv1alpha1.DragonwildsServerSpec) string {
+	if strings.TrimSpace(spec.Backup.Schedule) != "" {
+		return spec.Backup.Schedule
+	}
+	return DefaultBackupSchedule
+}
+
+// BackupRetain returns how many tar archives to keep.
+func BackupRetain(spec dragonwildsv1alpha1.DragonwildsServerSpec) int32 {
+	if spec.Backup.Retain > 0 {
+		return spec.Backup.Retain
+	}
+	return DefaultBackupRetain
+}
+
+// BackupSize returns the backup PVC size.
+func BackupSize(spec dragonwildsv1alpha1.DragonwildsServerSpec) string {
+	if strings.TrimSpace(spec.Backup.Size) != "" {
+		return spec.Backup.Size
+	}
+	return PersistenceSize(spec)
+}
+
+// BackupImage returns the backup job image.
+func BackupImage(spec dragonwildsv1alpha1.DragonwildsServerSpec) string {
+	if strings.TrimSpace(spec.Backup.Image) != "" {
+		return spec.Backup.Image
+	}
+	return DefaultBackupImage
+}
+
+// BackupStorageClass returns the backup PVC storage class (may be empty).
+func BackupStorageClass(spec dragonwildsv1alpha1.DragonwildsServerSpec) string {
+	if strings.TrimSpace(spec.Backup.StorageClassName) != "" {
+		return spec.Backup.StorageClassName
+	}
+	return spec.Persistence.StorageClassName
 }

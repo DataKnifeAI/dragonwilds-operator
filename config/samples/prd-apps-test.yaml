@@ -1,4 +1,4 @@
-# Test deploy for prd-apps game-servers namespace (Envoy Gateway VIP).
+# Test deploy for prd-apps game-servers namespace (direct kube-vip LoadBalancer).
 # Set ownerId, then: kubectl apply -f config/samples/prd-apps-test.yaml
 apiVersion: dragonwilds.dataknife.ai/v1alpha1
 kind: DragonwildsServer
@@ -25,10 +25,16 @@ spec:
     autoUpdateImage: false
     validateOnStart: false
 
+  # Direct VIP — Envoy UDP proxy breaks Dragonwilds client source IPs.
   gateway:
-    enabled: true
-    className: envoy
+    enabled: false
+    serviceType: LoadBalancer
     address: "192.168.14.188"
+
+  backup:
+    enabled: true
+    schedule: "0 4 * * *"
+    retain: 7
 
   persistence:
     size: 20Gi
