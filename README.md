@@ -1,5 +1,9 @@
 # dragonwilds-operator
 
+<p align="center">
+  <img src="docs/assets/hero-dragonwilds-operator.jpg" alt="Dragonwilds Operator — Ashenfall world keeper" width="640">
+</p>
+
 Kubernetes operator for [RuneScape: Dragonwilds](https://www.runescape.com/dragonwilds) dedicated servers.
 One custom resource (`DragonwildsServer`) reconciles Deployment, PVC, ConfigMap, Secret, and Service around Jagex’s official image [`ghcr.io/runescape/rsdw-dedicated`](https://github.com/runescape/rsdw-dedicated).
 
