@@ -21,6 +21,7 @@ import (
 
 	dragonwildsv1alpha1 "github.com/DataKnifeAI/dragonwilds-operator/api/v1alpha1"
 	"github.com/DataKnifeAI/dragonwilds-operator/internal/config"
+	"github.com/DataKnifeAI/dragonwilds-operator/internal/gateway"
 	"github.com/DataKnifeAI/dragonwilds-operator/internal/provisioner"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -36,6 +37,7 @@ func (r *DragonwildsServerReconciler) reconcileServerManager(
 	secretName string,
 ) error {
 	if !server.Spec.ServerManager.Enabled {
+		_ = r.deleteServerManagerGateway(ctx, server, gateway.DeriveManagerNames(server))
 		return r.deleteServerManagerRBAC(ctx, server)
 	}
 
@@ -59,7 +61,10 @@ func (r *DragonwildsServerReconciler) reconcileServerManager(
 	if err := controllerutil.SetControllerReference(server, binding, r.Scheme); err != nil {
 		return err
 	}
-	return r.applyObject(ctx, binding)
+	if err := r.applyObject(ctx, binding); err != nil {
+		return err
+	}
+	return r.reconcileServerManagerGateway(ctx, server)
 }
 
 func (r *DragonwildsServerReconciler) deleteServerManagerRBAC(
@@ -82,6 +87,9 @@ func (r *DragonwildsServerReconciler) deleteServerManagerRBAC(
 func serverManagerStatus(server *dragonwildsv1alpha1.DragonwildsServer) (addr string, port int32) {
 	if !server.Spec.ServerManager.Enabled {
 		return "", 0
+	}
+	if config.ServerManagerHTTPSEnabled(server.Spec) {
+		return config.ServerManagerHostname(server.Spec), config.ServerManagerHTTPSPort(server.Spec)
 	}
 	addr = server.Spec.Gateway.Address
 	if addr == "" {

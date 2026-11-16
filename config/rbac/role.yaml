@@ -116,6 +116,7 @@ rules:
   - gateway.networking.k8s.io
   resources:
   - gateways
+  - httproutes
   - udproutes
   verbs:
   - create

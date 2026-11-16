@@ -4,130 +4,391 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Dragonwilds Server Manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <style>
 :root {
-  --bg: #1a1612; --panel: #2a221c; --ink: #f3ebe1; --muted: #b5a896;
-  --accent: #c45c26; --ok: #6a9b6a; --bad: #c45c5c; --line: #3d342c;
-  --font: "Segoe UI", system-ui, sans-serif;
+  --bone: #e6e2d6;
+  --mist: #f2efe6;
+  --paper: #faf7f0;
+  --ash: #2a3238;
+  --slate: #3d4850;
+  --muted: #5c6870;
+  --ember: #b54a28;
+  --ember-hot: #d46238;
+  --copper: #a87842;
+  --moss: #3d6b4f;
+  --moss-soft: #dce8df;
+  --line: rgba(42,50,56,.14);
+  --veil: rgba(20,28,32,.62);
+  --font-display: "Sora", "Segoe UI", sans-serif;
+  --font-body: "Source Sans 3", "Segoe UI", sans-serif;
 }
 * { box-sizing: border-box; }
-body { margin: 0; font-family: var(--font); background: var(--bg); color: var(--ink); }
-header { padding: 1.1rem 1.25rem; border-bottom: 1px solid var(--line); display: flex; gap: 1rem; align-items: baseline; flex-wrap: wrap; }
-header h1 { margin: 0; font-size: 1.25rem; letter-spacing: .02em; }
-header .muted { color: var(--muted); font-size: .9rem; }
-nav { display: flex; gap: .35rem; padding: .75rem 1.25rem; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
-nav button {
-  background: transparent; border: 1px solid var(--line); color: var(--ink);
-  padding: .4rem .75rem; border-radius: 4px; cursor: pointer;
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 1.05rem;
+  line-height: 1.5;
+  color: var(--ash);
+  background:
+    radial-gradient(ellipse 70% 36% at 8% -8%, rgba(181,74,40,.10), transparent 52%),
+    radial-gradient(ellipse 48% 28% at 100% 4%, rgba(61,107,79,.10), transparent 48%),
+    var(--bone);
 }
-nav button.active { border-color: var(--accent); background: #3a2a22; }
-main { max-width: 52rem; margin: 0 auto; padding: 1.25rem; }
-.card { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 1rem 1.1rem; margin-bottom: 1rem; }
-.card h2 { margin: 0 0 .75rem; font-size: 1rem; }
-.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: .65rem; }
-.stat { background: #211c17; border-radius: 4px; padding: .65rem .75rem; }
-.stat .k { color: var(--muted); font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; }
-.stat .v { font-size: 1rem; margin-top: .2rem; word-break: break-all; }
-label { display: block; font-size: .78rem; color: var(--muted); margin: .55rem 0 .2rem; }
-input, textarea { width: 100%; padding: .45rem .55rem; border-radius: 4px; border: 1px solid var(--line); background: #211c17; color: var(--ink); }
-.row { display: flex; flex-wrap: wrap; gap: .55rem; margin-top: .85rem; align-items: center; }
-button.primary, a.btn {
-  background: var(--accent); border: 0; color: #fff; padding: .45rem .85rem;
-  border-radius: 4px; cursor: pointer; text-decoration: none; font-size: .9rem;
+@keyframes rise {
+  from { opacity: 0; transform: translateY(.55rem); }
+  to { opacity: 1; transform: translateY(0); }
 }
-button.ghost { background: transparent; border: 1px solid var(--line); color: var(--ink); padding: .45rem .85rem; border-radius: 4px; cursor: pointer; }
-.msg { min-height: 1.2em; margin-top: .55rem; font-size: .88rem; }
-.msg.ok { color: var(--ok); }
-.msg.err { color: var(--bad); }
-.hidden { display: none; }
-table { width: 100%; border-collapse: collapse; font-size: .9rem; }
-td, th { text-align: left; padding: .35rem .25rem; border-bottom: 1px solid var(--line); }
-.hint { color: var(--muted); font-size: .85rem; margin: 0 0 .75rem; }
+@keyframes veil-drift {
+  from { transform: scale(1.04); }
+  to { transform: scale(1); }
+}
+
+.hero {
+  position: relative;
+  min-height: 15.5rem;
+  display: grid;
+  align-items: end;
+  overflow: hidden;
+  color: #f7f1e6;
+  background: #2a3238;
+}
+.hero__media { position: absolute; inset: 0; pointer-events: none; }
+.hero__photo {
+  width: 100%; height: 100%;
+  object-fit: cover; object-position: 48% 40%;
+  animation: veil-drift 1.4s ease-out both;
+}
+.hero__veil {
+  position: absolute; inset: 0;
+  background:
+    linear-gradient(112deg, rgba(20,28,32,.78) 0%, rgba(20,28,32,.48) 42%, rgba(20,28,32,.12) 100%),
+    linear-gradient(180deg, rgba(20,28,32,.18) 0%, transparent 40%, rgba(20,28,32,.55) 100%);
+}
+.hero__content {
+  position: relative; z-index: 2;
+  width: min(100% - 2.2rem, 60rem);
+  margin: 0 auto;
+  padding: 2.4rem 0 1.55rem;
+  display: flex; justify-content: space-between; align-items: flex-end; gap: 1rem;
+  animation: rise .7s ease-out .1s both;
+}
+.hero h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.85rem, 5.2vw, 2.85rem);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1;
+  color: var(--mist);
+  text-shadow: 0 2px 0 rgba(0,0,0,.2), 0 10px 28px rgba(0,0,0,.35);
+}
+.hero__sub {
+  margin: .45rem 0 0;
+  font-size: .92rem;
+  font-weight: 600;
+  color: rgba(242,239,230,.82);
+  letter-spacing: .01em;
+}
+.wave { display: block; width: 100%; height: 2.85rem; margin-top: -1px; }
+.btn-logout {
+  flex: 0 0 auto;
+  appearance: none;
+  background: rgba(242,239,230,.14);
+  color: #f7f1e6;
+  border: 1px solid rgba(242,239,230,.42);
+  border-radius: .3rem;
+  padding: .48rem .85rem;
+  font: 700 .88rem var(--font-body);
+  text-decoration: none;
+  white-space: nowrap;
+  align-self: flex-end;
+  cursor: pointer;
+}
+.btn-logout:hover { background: rgba(242,239,230,.28); }
+.btn-logout:focus-visible { outline: 2px solid var(--ember-hot); outline-offset: 2px; }
+
+main {
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: 1.05rem 1.1rem 3.8rem;
+  animation: rise .65s ease-out .18s both;
+}
+.trail {
+  display: flex; flex-wrap: wrap; gap: 0;
+  margin: 0 0 1.1rem;
+  border-bottom: 3px solid var(--slate);
+}
+.trail button {
+  appearance: none; border: 0; background: transparent;
+  font: 700 .9rem var(--font-display);
+  color: var(--muted);
+  padding: .55rem .9rem .45rem;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -3px;
+  transition: color .15s ease, border-color .15s ease, background .15s ease;
+}
+.trail button[aria-selected="true"] {
+  color: var(--ember);
+  border-bottom-color: var(--ember-hot);
+  background: linear-gradient(180deg, transparent, rgba(181,74,40,.1));
+}
+.trail button:hover { color: var(--ash); }
+.trail button:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
+
+.panel { display: none; }
+.panel.active { display: block; animation: rise .35s ease-out; }
+.lede {
+  margin: 0 0 1rem;
+  color: var(--muted);
+  font-size: .95rem;
+  max-width: 40rem;
+}
+.group {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: .55rem;
+  padding: 1rem 1.1rem 1.1rem;
+  margin: 0 0 1rem;
+  box-shadow: 0 1px 0 rgba(42,50,56,.04);
+}
+.group h2 {
+  margin: 0 0 .35rem;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.group p, .hint {
+  margin: 0 0 .75rem;
+  font-size: .9rem;
+  color: var(--muted);
+}
+.group--warn {
+  border-color: rgba(181,74,40,.28);
+  box-shadow: inset 4px 0 0 var(--ember);
+}
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(12.5rem, 1fr));
+  gap: .75rem;
+  margin: 0 0 1rem;
+}
+.stat {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: .5rem;
+  padding: 1rem 1.05rem .95rem;
+  min-height: 5.6rem;
+}
+.stat b {
+  display: block;
+  font-family: var(--font-display);
+  font-size: clamp(1.2rem, 2.1vw, 1.55rem);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--ember);
+  word-break: break-all;
+  margin-bottom: .35rem;
+}
+.stat span {
+  font-size: .72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--muted);
+}
+.stat--wide { grid-column: 1 / -1; min-height: auto; }
+.stat--wide b { font-size: 1.15rem; color: var(--slate); }
+
+label {
+  display: block;
+  font-size: .75rem;
+  font-weight: 700;
+  color: var(--muted);
+  margin: .55rem 0 .2rem;
+}
+input[type=text], input[type=number], input[type=password], textarea {
+  width: 100%;
+  font: inherit;
+  padding: .48rem .58rem;
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: .3rem;
+  color: var(--ash);
+  min-width: 0;
+}
+input:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--ember);
+  outline-offset: 1px;
+}
+.check {
+  display: flex; align-items: center; gap: .45rem;
+  font-size: .92rem; font-weight: 600; color: var(--ash);
+  margin: .55rem 0;
+}
+.check input { width: 1.05rem; height: 1.05rem; accent-color: var(--ember); }
+.row {
+  display: flex; flex-wrap: wrap; gap: .65rem;
+  align-items: center; margin: .85rem 0 0;
+}
+button, a.btn {
+  cursor: pointer; border: 0; border-radius: .3rem;
+  padding: .48rem .85rem;
+  font: 700 .9rem var(--font-body);
+  text-decoration: none; display: inline-block;
+}
+.btn, button.primary { background: var(--ember); color: #fff; }
+.btn:hover, button.primary:hover { background: var(--ember-hot); }
+.btn-moss { background: var(--moss); color: #fff; }
+.btn-ghost {
+  background: #fff;
+  border: 1px solid var(--line);
+  color: var(--ash);
+}
+.btn-ghost:hover { background: var(--mist); }
+.msg { min-height: 1.15em; margin-top: .5rem; font-size: .88rem; font-weight: 600; }
+.msg.ok { color: var(--moss); }
+.msg.err { color: var(--ember); }
+table {
+  width: 100%; border-collapse: collapse;
+  background: var(--paper); border: 1px solid var(--line);
+  border-radius: .4rem; overflow: hidden;
+}
+th, td { text-align: left; padding: .48rem .65rem; border-bottom: 1px solid var(--line); font-size: .92rem; }
+th {
+  background: var(--moss-soft);
+  font-size: .72rem; text-transform: uppercase; letter-spacing: .04em;
+  font-family: var(--font-display); font-weight: 700; color: var(--moss);
+}
+code {
+  font-size: .86em;
+  background: rgba(181,74,40,.1);
+  padding: .05em .3em; border-radius: .2rem;
+}
+@media (max-width: 40rem) {
+  .hero { min-height: 12.5rem; }
+  .hero h1 { font-size: 1.7rem; }
+}
 </style>
 </head>
 <body>
-<header>
-  <h1>Dragonwilds Server Manager</h1>
-  <span class="muted" id="hdr-sub">loading…</span>
-  <span style="flex:1"></span>
-  <a class="btn" href="/logout" style="background:#5a4034">Log out</a>
+<header class="hero">
+  <div class="hero__media" aria-hidden="true">
+    <img class="hero__photo" src="/assets/hero.jpg" alt="" width="1280" height="720" decoding="async" fetchpriority="high"/>
+    <div class="hero__veil"></div>
+  </div>
+  <div class="hero__content">
+    <div>
+      <h1>Server Manager</h1>
+      <p class="hero__sub" id="hdr-sub">loading…</p>
+    </div>
+    <a class="btn-logout" href="/logout">Log out</a>
+  </div>
 </header>
-<nav id="nav">
-  <button data-tab="overview" class="active">Overview</button>
-  <button data-tab="controls">Controls</button>
-  <button data-tab="settings">Settings</button>
-  <button data-tab="access">Access</button>
-  <button data-tab="updates">Updates</button>
-  <button data-tab="backups">Backups</button>
-</nav>
+<svg class="wave" viewBox="0 0 1440 72" preserveAspectRatio="none" aria-hidden="true">
+  <path d="M0 30 C240 68 460 6 720 36 C980 70 1220 10 1440 34 L1440 72 L0 72 Z" fill="#f2efe6"/>
+  <path d="M0 46 C200 16 420 64 720 42 C1040 18 1260 60 1440 44 L1440 72 L0 72 Z" fill="#e6e2d6" opacity="0.95"/>
+</svg>
+
 <main>
-  <section id="tab-overview" class="tab">
-    <div class="card"><h2>Status</h2><div class="grid" id="stats"></div></div>
-    <div class="card"><h2>Direct connect</h2>
-      <p class="hint">Use Direct in-game — Recent/Public use WAN IP from EOS.</p>
-      <div class="stat"><div class="k">Address</div><div class="v" id="connect">—</div></div>
+  <nav class="trail" id="nav" role="tablist">
+    <button type="button" role="tab" data-tab="overview" aria-selected="true">Overview</button>
+    <button type="button" role="tab" data-tab="controls" aria-selected="false">Controls</button>
+    <button type="button" role="tab" data-tab="settings" aria-selected="false">Settings</button>
+    <button type="button" role="tab" data-tab="access" aria-selected="false">Access</button>
+    <button type="button" role="tab" data-tab="updates" aria-selected="false">Updates</button>
+    <button type="button" role="tab" data-tab="backups" aria-selected="false">Backups</button>
+  </nav>
+
+  <section id="tab-overview" class="panel active" role="tabpanel">
+    <p class="lede">Ops console for this Dragonwilds world — status, connect string, and world identity.</p>
+    <div class="stats" id="stats"></div>
+    <div class="group">
+      <h2>Direct connect</h2>
+      <p class="hint">Use Direct in-game. Recent/Public list the WAN IP from EOS, not this VIP.</p>
+      <div class="stat stat--wide"><span>Address</span><b id="connect">—</b></div>
     </div>
   </section>
 
-  <section id="tab-controls" class="tab hidden">
-    <div class="card"><h2>Controls</h2>
+  <section id="tab-controls" class="panel" role="tabpanel">
+    <div class="group group--warn">
+      <h2>Controls</h2>
       <p class="hint">Restart Recreate-rolls the Deployment (players disconnect). Settings that change env need a restart.</p>
       <div class="row">
-        <button class="primary" id="btn-restart">Restart server</button>
-        <a class="btn" href="/api/saves/download">Download world data (.tar.gz)</a>
+        <button class="primary" type="button" id="btn-restart">Restart server</button>
+        <a class="btn-moss btn" href="/api/saves/download">Download world data (.tar.gz)</a>
       </div>
       <div class="msg" id="controls-msg"></div>
     </div>
   </section>
 
-  <section id="tab-settings" class="tab hidden">
-    <div class="card"><h2>World / server</h2>
+  <section id="tab-settings" class="panel" role="tabpanel">
+    <div class="group">
+      <h2>World / server</h2>
       <p class="hint">Saved to the CR; restart to apply into the game process.</p>
-      <label>Server name</label><input id="f-serverName"/>
-      <label>World name</label><input id="f-worldName"/>
-      <label>Players (1–6)</label><input id="f-players" type="number" min="1" max="6"/>
-      <label>Owner Player ID</label><input id="f-ownerId"/>
-      <label>Admins (comma-separated Player IDs)</label><input id="f-admins"/>
-      <div class="row"><button class="primary" id="btn-settings">Save settings</button></div>
+      <label for="f-serverName">Server name</label>
+      <input id="f-serverName" type="text" autocomplete="off"/>
+      <label for="f-worldName">World name</label>
+      <input id="f-worldName" type="text" autocomplete="off"/>
+      <label for="f-players">Players (1–6)</label>
+      <input id="f-players" type="number" min="1" max="6"/>
+      <label for="f-ownerId">Owner Player ID</label>
+      <input id="f-ownerId" type="text" autocomplete="off"/>
+      <label for="f-admins">Admins (comma-separated Player IDs)</label>
+      <input id="f-admins" type="text" autocomplete="off"/>
+      <div class="row"><button class="primary" type="button" id="btn-settings">Save settings</button></div>
       <div class="msg" id="settings-msg"></div>
     </div>
   </section>
 
-  <section id="tab-access" class="tab hidden">
-    <div class="card"><h2>Passwords</h2>
+  <section id="tab-access" class="panel" role="tabpanel">
+    <div class="group">
+      <h2>Passwords</h2>
       <p class="hint">Updates the Secret only — restart to apply. Kick/ban stays in-game (Pause → Settings → Server Management).</p>
-      <label>World password</label><input id="f-worldPass" type="password" placeholder="new world password"/>
+      <label for="f-worldPass">World password</label>
+      <input id="f-worldPass" type="password" placeholder="new world password" autocomplete="new-password"/>
       <div class="row">
-        <button class="primary" id="btn-world-pass">Set world password</button>
-        <button class="ghost" id="btn-world-gen">Generate</button>
+        <button class="primary" type="button" id="btn-world-pass">Set world password</button>
+        <button class="btn-ghost" type="button" id="btn-world-gen">Generate</button>
       </div>
-      <label>Admin password (UI + legacy admin)</label><input id="f-adminPass" type="password" placeholder="new admin password"/>
+      <label for="f-adminPass">Admin password (UI + legacy admin)</label>
+      <input id="f-adminPass" type="password" placeholder="new admin password" autocomplete="new-password"/>
       <div class="row">
-        <button class="primary" id="btn-admin-pass">Set admin password</button>
-        <button class="ghost" id="btn-admin-gen">Generate</button>
+        <button class="primary" type="button" id="btn-admin-pass">Set admin password</button>
+        <button class="btn-ghost" type="button" id="btn-admin-gen">Generate</button>
       </div>
       <div class="msg" id="access-msg"></div>
     </div>
   </section>
 
-  <section id="tab-updates" class="tab hidden">
-    <div class="card"><h2>Steam / image updates</h2>
-      <label><input type="checkbox" id="f-autoUpdate"/> Auto-stop when Steam publishes a newer build</label>
-      <label><input type="checkbox" id="f-validate"/> Validate game files on start (STEAMAPPVALIDATE)</label>
-      <div class="row"><button class="primary" id="btn-updates">Save update flags</button></div>
+  <section id="tab-updates" class="panel" role="tabpanel">
+    <div class="group">
+      <h2>Steam / image updates</h2>
+      <label class="check"><input type="checkbox" id="f-autoUpdate"/> Auto-stop when Steam publishes a newer build</label>
+      <label class="check"><input type="checkbox" id="f-validate"/> Validate game files on start (STEAMAPPVALIDATE)</label>
+      <div class="row"><button class="primary" type="button" id="btn-updates">Save update flags</button></div>
       <div class="msg" id="updates-msg"></div>
     </div>
   </section>
 
-  <section id="tab-backups" class="tab hidden">
-    <div class="card"><h2>Backups</h2>
+  <section id="tab-backups" class="panel" role="tabpanel">
+    <div class="group">
+      <h2>Backups</h2>
       <p class="hint">Requires <code>spec.backup.enabled</code>. Archives live on the backups PVC.</p>
       <div class="row">
-        <button class="primary" id="btn-backup-run">Run backup now</button>
-        <button class="ghost" id="btn-backup-refresh">Refresh list</button>
+        <button class="primary" type="button" id="btn-backup-run">Run backup now</button>
+        <button class="btn-ghost" type="button" id="btn-backup-refresh">Refresh list</button>
       </div>
       <div class="msg" id="backups-msg"></div>
-      <table><thead><tr><th>Archive</th><th>Size</th><th></th></tr></thead><tbody id="backup-rows"></tbody></table>
+      <table>
+        <thead><tr><th>Archive</th><th>Size</th><th></th></tr></thead>
+        <tbody id="backup-rows"></tbody>
+      </table>
     </div>
   </section>
 </main>
@@ -136,7 +397,11 @@ const $ = (id) => document.getElementById(id);
 const opts = { credentials: "same-origin" };
 
 async function api(path, init) {
-  const r = await fetch(path, Object ...opts, ...init, headers: { "Content-Type": "application/json", ...(init && init.headers || {}) } });
+  const r = await fetch(path, {
+    ...opts,
+    ...init,
+    headers: { "Content-Type": "application/json", ...((init && init.headers) || {}) },
+  });
   const text = await r.text();
   let data = {};
   try { data = text ? JSON.parse(text) : {}; } catch { data = { error: text }; }
@@ -165,7 +430,7 @@ function paint(status) {
     ["Backup", status.backupEnabled ? "on" : "off"],
   ];
   $("stats").innerHTML = cells.map(function(pair) {
-    return '<div class="stat"><div class="k">' + pair[0] + '</div><div class="v">' + pair[1] + '</div></div>';
+    return '<div class="stat"><b>' + pair[1] + '</b><span>' + pair[0] + '</span></div>';
   }).join("");
   $("f-serverName").value = status.serverName || "";
   $("f-worldName").value = status.specWorldName || status.worldName || "";
@@ -183,10 +448,10 @@ async function refresh() {
 
 document.querySelectorAll("#nav button").forEach(btn => {
   btn.addEventListener("click", () => {
-    document.querySelectorAll("#nav button").forEach(b => b.classList.remove("active"));
-    btn.classList.add("active");
-    document.querySelectorAll(".tab").forEach(t => t.classList.add("hidden"));
-    $("tab-" + btn.dataset.tab).classList.remove("hidden");
+    document.querySelectorAll("#nav button").forEach(b => b.setAttribute("aria-selected", "false"));
+    btn.setAttribute("aria-selected", "true");
+    document.querySelectorAll(".panel").forEach(t => t.classList.remove("active"));
+    $("tab-" + btn.dataset.tab).classList.add("active");
   });
 });
 

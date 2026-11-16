@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+## 0.2.2
+
+### Changed
+
+- Server Manager UI: Ashenfall bone/slate/ember theme (hero + trail tabs),
+  distinct from Palworld’s teal/grass look; embeds operator hero art.
+
+## 0.2.1
+
+### Fixed
+
+- Server Manager UI JavaScript (`fetch` options) so tabs/API work after login.
+
+### Added
+
+- `spec.serverManager.hostname` / `httpsPort` / `tlsSecretRef` — Gateway API HTTPS
+  (`HTTPRoute` + Envoy terminate) sharing the game VIP via `externalIPs`.
+
+## 0.2.0
+
 ### Added
 
 - Optional `spec.serverManager` admin UI sidecar (`/server-manager` in the operator

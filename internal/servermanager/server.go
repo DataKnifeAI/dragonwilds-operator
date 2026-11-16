@@ -72,6 +72,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) routes() {
 	s.mux.HandleFunc("GET /{$}", s.withAuth(s.handleUI))
+	s.mux.Handle("GET /assets/", http.StripPrefix("/assets/", s.withAuthHandler(assetHandler())))
 	s.mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
@@ -88,7 +89,11 @@ func (s *Server) routes() {
 }
 
 func (s *Server) withAuth(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return s.withAuthHandler(next).ServeHTTP
+}
+
+func (s *Server) withAuthHandler(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user, pass, ok := r.BasicAuth()
 		if !ok ||
 			subtle.ConstantTimeCompare([]byte(user), []byte(s.cfg.User)) != 1 ||
@@ -97,8 +102,8 @@ func (s *Server) withAuth(next http.HandlerFunc) http.HandlerFunc {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
-		next(w, r)
-	}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, _ *http.Request) {

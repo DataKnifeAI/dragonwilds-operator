@@ -6,15 +6,21 @@ Optional authenticated admin UI (Palworld-style, Dragonwilds-scoped).
 spec:
   serverManager:
     enabled: true
-    port: 8088   # TCP on the same VIP as game UDP
-    # image: harbor.dataknife.net/library/dragonwilds-operator:v0.1.0
+    port: 8088   # sidecar + optional direct VIP:8088
+    hostname: dragonwilds.dataknife.net
+    httpsPort: 443
+    tlsSecretRef:
+      name: wildcard-dataknife-net-tls
+    # image: harbor.dataknife.net/library/dragonwilds-operator:v0.2.1
 ```
 
 ## Access
 
-- URL: `http://<status.serverManagerAddress>:<status.serverManagerPort>/`
+- HTTPS (Gateway API): `https://<hostname>/` when `hostname` + `tlsSecretRef` are set
+- Direct: `http://<VIP>:8088/` still works on the game LoadBalancer Service
 - Auth: basic — user `admin`, password = Secret `admin-password`
 - Enabling Recreate-rolls the game Deployment (sidecar + Service TCP port)
+- HTTPS uses a dedicated Envoy Gateway with `externalIPs=[gateway.address]` so it shares the game VIP without a second kube-vip claim
 
 ## Tabs
 

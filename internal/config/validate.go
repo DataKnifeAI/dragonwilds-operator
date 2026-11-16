@@ -44,6 +44,30 @@ func ValidateSpec(spec dragonwildsv1alpha1.DragonwildsServerSpec) error {
 	if !gatewayEnabled(spec) && spec.Gateway.ServiceType == "LoadBalancer" && strings.TrimSpace(spec.Gateway.Address) == "" {
 		return fmt.Errorf("spec.gateway.address is required when serviceType is LoadBalancer")
 	}
+	if err := validateServerManager(spec); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateServerManager(spec dragonwildsv1alpha1.DragonwildsServerSpec) error {
+	if !spec.ServerManager.Enabled {
+		return nil
+	}
+	host := strings.TrimSpace(spec.ServerManager.Hostname)
+	ref := spec.ServerManager.TLSSecretRef
+	if host == "" && ref == nil {
+		return nil
+	}
+	if host == "" {
+		return fmt.Errorf("spec.serverManager.hostname is required when tlsSecretRef is set")
+	}
+	if ref == nil || strings.TrimSpace(ref.Name) == "" {
+		return fmt.Errorf("spec.serverManager.tlsSecretRef.name is required when hostname is set")
+	}
+	if strings.TrimSpace(spec.Gateway.Address) == "" {
+		return fmt.Errorf("spec.gateway.address is required for server manager HTTPS (VIP for Gateway externalIPs)")
+	}
 	return nil
 }
 
@@ -149,9 +173,10 @@ const (
 	DefaultBackupSchedule     = "0 4 * * *"
 	DefaultBackupRetain       = int32(7)
 	DefaultBackupImage        = "busybox:1.36"
-	DefaultServerManagerPort  = int32(8088)
-	DefaultServerManagerImage = "harbor.dataknife.net/library/dragonwilds-operator:v0.2.0"
-	DefaultServerManagerUser  = "admin"
+	DefaultServerManagerPort      = int32(8088)
+	DefaultServerManagerHTTPSPort = int32(443)
+	DefaultServerManagerImage     = "harbor.dataknife.net/library/dragonwilds-operator:v0.2.2"
+	DefaultServerManagerUser      = "admin"
 )
 
 // ServerManagerPort returns the TCP port for the admin UI sidecar.
@@ -160,6 +185,27 @@ func ServerManagerPort(spec dragonwildsv1alpha1.DragonwildsServerSpec) int32 {
 		return spec.ServerManager.Port
 	}
 	return DefaultServerManagerPort
+}
+
+// ServerManagerHTTPSPort returns the Gateway HTTPS listen port.
+func ServerManagerHTTPSPort(spec dragonwildsv1alpha1.DragonwildsServerSpec) int32 {
+	if spec.ServerManager.HTTPSPort > 0 {
+		return spec.ServerManager.HTTPSPort
+	}
+	return DefaultServerManagerHTTPSPort
+}
+
+// ServerManagerHostname returns the trimmed HTTPS hostname (may be empty).
+func ServerManagerHostname(spec dragonwildsv1alpha1.DragonwildsServerSpec) string {
+	return strings.TrimSpace(spec.ServerManager.Hostname)
+}
+
+// ServerManagerHTTPSEnabled is true when hostname + tlsSecretRef are set.
+func ServerManagerHTTPSEnabled(spec dragonwildsv1alpha1.DragonwildsServerSpec) bool {
+	return spec.ServerManager.Enabled &&
+		ServerManagerHostname(spec) != "" &&
+		spec.ServerManager.TLSSecretRef != nil &&
+		strings.TrimSpace(spec.ServerManager.TLSSecretRef.Name) != ""
 }
 
 // ServerManagerImage returns the sidecar image (operator image with /server-manager).

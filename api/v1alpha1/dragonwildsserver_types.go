@@ -118,8 +118,9 @@ type PersistenceConfig struct {
 
 // ServerManagerConfig is an optional authenticated admin UI sidecar on the
 // game pod. When enabled, TCP port (default 8088) is published on the same
-// Service as game UDP (LoadBalancer VIP:port). Basic auth uses username
-// "admin" and the admin-password Secret key.
+// Service as game UDP (LoadBalancer VIP:port). With hostname + tlsSecretRef,
+// the operator also creates a Gateway API HTTPS listener (Envoy) and HTTPRoute.
+// Basic auth uses username "admin" and the admin-password Secret key.
 type ServerManagerConfig struct {
 	// Enabled starts the Server Manager sidecar and exposes its TCP port.
 	// Default false. Enabling Recreate-rolls the game Deployment.
@@ -132,6 +133,26 @@ type ServerManagerConfig struct {
 	// +kubebuilder:validation:Maximum=65535
 	// +optional
 	Port int32 `json:"port,omitempty"`
+
+	// Hostname is the public DNS name for HTTPS (must match the TLS cert SAN,
+	// e.g. dragonwilds.dataknife.net). When set with tlsSecretRef, the operator
+	// creates Gateway + HTTPRoute (HTTPS terminate). Required for HTTPS UI.
+	// +optional
+	Hostname string `json:"hostname,omitempty"`
+
+	// HTTPSPort is the Gateway HTTPS listen port. Default 443.
+	// +kubebuilder:default=443
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=65535
+	// +optional
+	HTTPSPort int32 `json:"httpsPort,omitempty"`
+
+	// TLSSecretRef is an existing kubernetes.io/tls Secret (reuse a Let's Encrypt
+	// wildcard — the operator does not issue certificates). Name is required
+	// when hostname is set. Namespace defaults to the DragonwildsServer
+	// namespace; a different namespace is copied locally for Gateway terminate.
+	// +optional
+	TLSSecretRef *corev1.SecretReference `json:"tlsSecretRef,omitempty"`
 
 	// Image is the container image that provides /server-manager (the operator
 	// image). Default: harbor.dataknife.net/library/dragonwilds-operator:latest

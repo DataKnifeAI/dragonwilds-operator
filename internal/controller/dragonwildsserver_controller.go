@@ -68,6 +68,7 @@ type DragonwildsServerReconciler struct {
 // +kubebuilder:rbac:groups="",resources=pods/log,verbs=get
 // +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=gateways,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=udproutes,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=httproutes,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=gatewayclasses,verbs=get;list;watch
 // +kubebuilder:rbac:groups=gateway.envoyproxy.io,resources=envoyproxies,verbs=get;list;watch;create;update;patch;delete
 
@@ -202,7 +203,11 @@ func (r *DragonwildsServerReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	if server.Spec.ServerManager.Enabled {
 		smAddr, smPort := serverManagerStatus(server)
 		if smAddr != "" {
-			message = message + fmt.Sprintf("; server manager http://%s:%d (admin + admin-password)", smAddr, smPort)
+			scheme := "http"
+			if config.ServerManagerHTTPSEnabled(server.Spec) {
+				scheme = "https"
+			}
+			message = message + fmt.Sprintf("; server manager %s://%s:%d (admin + admin-password)", scheme, smAddr, smPort)
 		}
 	}
 
@@ -365,6 +370,7 @@ func (r *DragonwildsServerReconciler) applyObject(ctx context.Context, obj clien
 	case *egv1a1.EnvoyProxy:
 		cur := existing.(*egv1a1.EnvoyProxy)
 		cur.Labels = desired.Labels
+		cur.OwnerReferences = desired.OwnerReferences
 		cur.Spec = desired.Spec
 		return r.Update(ctx, cur)
 	case *batchv1.CronJob:
@@ -390,11 +396,19 @@ func (r *DragonwildsServerReconciler) applyObject(ctx context.Context, obj clien
 	case *gatewayv1.Gateway:
 		cur := existing.(*gatewayv1.Gateway)
 		cur.Labels = desired.Labels
+		cur.OwnerReferences = desired.OwnerReferences
+		cur.Spec = desired.Spec
+		return r.Update(ctx, cur)
+	case *gatewayv1.HTTPRoute:
+		cur := existing.(*gatewayv1.HTTPRoute)
+		cur.Labels = desired.Labels
+		cur.OwnerReferences = desired.OwnerReferences
 		cur.Spec = desired.Spec
 		return r.Update(ctx, cur)
 	case *gatewayv1alpha2.UDPRoute:
 		cur := existing.(*gatewayv1alpha2.UDPRoute)
 		cur.Labels = desired.Labels
+		cur.OwnerReferences = desired.OwnerReferences
 		cur.Spec = desired.Spec
 		return r.Update(ctx, cur)
 	default:

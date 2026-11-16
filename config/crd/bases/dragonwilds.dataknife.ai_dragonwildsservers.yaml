@@ -333,6 +333,20 @@ spec:
                       Enabled starts the Server Manager sidecar and exposes its TCP port.
                       Default false. Enabling Recreate-rolls the game Deployment.
                     type: boolean
+                  hostname:
+                    description: |-
+                      Hostname is the public DNS name for HTTPS (must match the TLS cert SAN,
+                      e.g. dragonwilds.dataknife.net). When set with tlsSecretRef, the operator
+                      creates Gateway + HTTPRoute (HTTPS terminate). Required for HTTPS UI.
+                    type: string
+                  httpsPort:
+                    default: 443
+                    description: HTTPSPort is the Gateway HTTPS listen port. Default
+                      443.
+                    format: int32
+                    maximum: 65535
+                    minimum: 1
+                    type: integer
                   image:
                     description: |-
                       Image is the container image that provides /server-manager (the operator
@@ -346,6 +360,23 @@ spec:
                     maximum: 65535
                     minimum: 1024
                     type: integer
+                  tlsSecretRef:
+                    description: |-
+                      TLSSecretRef is an existing kubernetes.io/tls Secret (reuse a Let's Encrypt
+                      wildcard — the operator does not issue certificates). Name is required
+                      when hostname is set. Namespace defaults to the DragonwildsServer
+                      namespace; a different namespace is copied locally for Gateway terminate.
+                    properties:
+                      name:
+                        description: name is unique within a namespace to reference
+                          a secret resource.
+                        type: string
+                      namespace:
+                        description: namespace defines the space within which the
+                          secret name must be unique.
+                        type: string
+                    type: object
+                    x-kubernetes-map-type: atomic
                 type: object
               serverName:
                 description: ServerName is the display name for the dedicated server
