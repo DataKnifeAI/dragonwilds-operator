@@ -325,6 +325,28 @@ spec:
                       More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                     type: object
                 type: object
+              serverManager:
+                description: ServerManager is an optional authenticated admin UI sidecar.
+                properties:
+                  enabled:
+                    description: |-
+                      Enabled starts the Server Manager sidecar and exposes its TCP port.
+                      Default false. Enabling Recreate-rolls the game Deployment.
+                    type: boolean
+                  image:
+                    description: |-
+                      Image is the container image that provides /server-manager (the operator
+                      image). Default: harbor.dataknife.net/library/dragonwilds-operator:latest
+                    type: string
+                  port:
+                    default: 8088
+                    description: Port is the sidecar listen port (and Service TCP
+                      port). Default 8088.
+                    format: int32
+                    maximum: 65535
+                    minimum: 1024
+                    type: integer
+                type: object
               serverName:
                 description: ServerName is the display name for the dedicated server
                   (RSDW_SERVER_NAME).
@@ -459,6 +481,15 @@ spec:
                 description: RunningBuildId is the game BuildId parsed from server
                   session logs when Ready.
                 type: string
+              serverManagerAddress:
+                description: ServerManagerAddress is the IP for the optional admin
+                  UI (usually the VIP).
+                type: string
+              serverManagerPort:
+                description: ServerManagerPort is the TCP port for the optional admin
+                  UI.
+                format: int32
+                type: integer
               worldName:
                 description: WorldName is the observed/recorded world name after first
                   successful start.

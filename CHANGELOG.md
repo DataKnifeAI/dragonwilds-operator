@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Optional `spec.serverManager` admin UI sidecar (`/server-manager` in the operator
+  image): Overview, Controls, Settings, Access, Updates, Backups on
+  `http://VIP:8088` with basic auth (`admin` + `admin-password`).
+
 ## 0.1.0
 
 ### Added

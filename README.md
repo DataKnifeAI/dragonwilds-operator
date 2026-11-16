@@ -44,6 +44,7 @@ See [docs/LOCAL.md](docs/LOCAL.md) — Docker Compose with the same official ima
 | [GAME_SERVER.md](docs/GAME_SERVER.md) | Ports, env, ini, saves, updates |
 | [CONNECT.md](docs/CONNECT.md) | Join / VIP / Recent vs Direct |
 | [BACKUP.md](docs/BACKUP.md) | Optional CronJob backups |
+| [SERVER_MANAGER.md](docs/SERVER_MANAGER.md) | Optional admin UI sidecar |
 | [METRICS.md](docs/METRICS.md) | Prometheus ServiceMonitor |
 | [LOCAL.md](docs/LOCAL.md) | Compose path |
 | [FAQ.md](docs/FAQ.md) | Common footguns |

@@ -36,6 +36,10 @@ spec:
     schedule: "0 4 * * *"
     retain: 7
 
+  serverManager:
+    enabled: true
+    port: 8088
+
   persistence:
     size: 20Gi
     storageClassName: truenas-csi-nfs

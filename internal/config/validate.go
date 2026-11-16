@@ -146,10 +146,29 @@ func GatewayEnabled(spec dragonwildsv1alpha1.DragonwildsServerSpec) bool {
 }
 
 const (
-	DefaultBackupSchedule = "0 4 * * *"
-	DefaultBackupRetain   = int32(7)
-	DefaultBackupImage    = "busybox:1.36"
+	DefaultBackupSchedule     = "0 4 * * *"
+	DefaultBackupRetain       = int32(7)
+	DefaultBackupImage        = "busybox:1.36"
+	DefaultServerManagerPort  = int32(8088)
+	DefaultServerManagerImage = "harbor.dataknife.net/library/dragonwilds-operator:v0.2.0"
+	DefaultServerManagerUser  = "admin"
 )
+
+// ServerManagerPort returns the TCP port for the admin UI sidecar.
+func ServerManagerPort(spec dragonwildsv1alpha1.DragonwildsServerSpec) int32 {
+	if spec.ServerManager.Port > 0 {
+		return spec.ServerManager.Port
+	}
+	return DefaultServerManagerPort
+}
+
+// ServerManagerImage returns the sidecar image (operator image with /server-manager).
+func ServerManagerImage(spec dragonwildsv1alpha1.DragonwildsServerSpec) string {
+	if strings.TrimSpace(spec.ServerManager.Image) != "" {
+		return spec.ServerManager.Image
+	}
+	return DefaultServerManagerImage
+}
 
 // BackupSchedule returns the Cron schedule for world backups.
 func BackupSchedule(spec dragonwildsv1alpha1.DragonwildsServerSpec) string {

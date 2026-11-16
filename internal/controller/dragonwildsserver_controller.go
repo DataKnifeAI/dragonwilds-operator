@@ -27,6 +27,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -58,6 +59,10 @@ type DragonwildsServerReconciler struct {
 // +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=batch,resources=cronjobs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings,verbs=get;list;watch;create;update;patch;delete
+// Operator must hold verbs it grants into namespaced Roles (RBAC escalation rules).
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=pods/log,verbs=get
@@ -155,6 +160,15 @@ func (r *DragonwildsServerReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, err
 	}
 
+	if err := r.reconcileServerManager(ctx, server, secret.Name); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	// Backup PVC must exist before the Deployment mounts it for the UI sidecar.
+	if err := r.reconcileBackup(ctx, server); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	configHash := cm.Annotations[provisioner.AnnotationConfigHash]
 	deploy := provisioner.BuildDeployment(server, configHash, secret.Name)
 	if err := controllerutil.SetControllerReference(server, deploy, r.Scheme); err != nil {
@@ -166,10 +180,6 @@ func (r *DragonwildsServerReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	gw, err := r.reconcileGatewayStack(ctx, server)
 	if err != nil {
-		return ctrl.Result{}, err
-	}
-
-	if err := r.reconcileBackup(ctx, server); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -189,12 +199,19 @@ func (r *DragonwildsServerReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			message = message + "; " + gw.Message
 		}
 	}
+	if server.Spec.ServerManager.Enabled {
+		smAddr, smPort := serverManagerStatus(server)
+		if smAddr != "" {
+			message = message + fmt.Sprintf("; server manager http://%s:%d (admin + admin-password)", smAddr, smPort)
+		}
+	}
 
 	connAddr := gw.Address
 	if !config.GatewayEnabled(server.Spec) {
 		// Direct Service exposure (NodePort / LoadBalancer VIP).
 		connAddr = server.Spec.Gateway.Address
 	}
+	smAddr, smPort := serverManagerStatus(server)
 
 	obs := observedRuntime{}
 	if ready {
@@ -208,6 +225,8 @@ func (r *DragonwildsServerReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		s.Status.ConnectionAddress = connAddr
 		s.Status.ConnectionPort = config.GamePort(server.Spec)
 		s.Status.BeaconPort = config.BeaconPort(server.Spec)
+		s.Status.ServerManagerAddress = smAddr
+		s.Status.ServerManagerPort = smPort
 		s.Status.CredentialsSecretName = secret.Name
 		s.Status.CredentialsGenerated = generated
 		s.Status.ImageVersion = config.ImageRef(server.Spec)
@@ -353,6 +372,21 @@ func (r *DragonwildsServerReconciler) applyObject(ctx context.Context, obj clien
 		cur.Labels = desired.Labels
 		cur.Spec = desired.Spec
 		return r.Update(ctx, cur)
+	case *corev1.ServiceAccount:
+		cur := existing.(*corev1.ServiceAccount)
+		cur.Labels = desired.Labels
+		return r.Update(ctx, cur)
+	case *rbacv1.Role:
+		cur := existing.(*rbacv1.Role)
+		cur.Labels = desired.Labels
+		cur.Rules = desired.Rules
+		return r.Update(ctx, cur)
+	case *rbacv1.RoleBinding:
+		cur := existing.(*rbacv1.RoleBinding)
+		cur.Labels = desired.Labels
+		cur.Subjects = desired.Subjects
+		cur.RoleRef = desired.RoleRef
+		return r.Update(ctx, cur)
 	case *gatewayv1.Gateway:
 		cur := existing.(*gatewayv1.Gateway)
 		cur.Labels = desired.Labels
@@ -429,6 +463,9 @@ func (r *DragonwildsServerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.Secret{}).
 		Owns(&corev1.PersistentVolumeClaim{}).
 		Owns(&batchv1.CronJob{}).
+		Owns(&corev1.ServiceAccount{}).
+		Owns(&rbacv1.Role{}).
+		Owns(&rbacv1.RoleBinding{}).
 		Owns(&gatewayv1.Gateway{}).
 		Owns(&gatewayv1alpha2.UDPRoute{}).
 		Owns(&egv1a1.EnvoyProxy{}).

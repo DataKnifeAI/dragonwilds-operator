@@ -84,23 +84,26 @@ func BuildService(server *dragonwildsv1alpha1.DragonwildsServer) *corev1.Service
 		svcType = server.Spec.Gateway.ServiceType
 	}
 
+	ports := []corev1.ServicePort{
+		{
+			Name:       "game",
+			Protocol:   corev1.ProtocolUDP,
+			Port:       gamePort,
+			TargetPort: intstr.FromInt32(gamePort),
+		},
+		{
+			Name:       "beacon",
+			Protocol:   corev1.ProtocolUDP,
+			Port:       beaconPort,
+			TargetPort: intstr.FromInt32(beaconPort),
+		},
+	}
+	ports = AppendServerManagerServicePort(server, ports)
+
 	spec := corev1.ServiceSpec{
 		Type:     svcType,
 		Selector: labelsFor(server),
-		Ports: []corev1.ServicePort{
-			{
-				Name:       "game",
-				Protocol:   corev1.ProtocolUDP,
-				Port:       gamePort,
-				TargetPort: intstr.FromInt32(gamePort),
-			},
-			{
-				Name:       "beacon",
-				Protocol:   corev1.ProtocolUDP,
-				Port:       beaconPort,
-				TargetPort: intstr.FromInt32(beaconPort),
-			},
-		},
+		Ports:    ports,
 	}
 	if !config.GatewayEnabled(server.Spec) && svcType == corev1.ServiceTypeLoadBalancer {
 		if addr := server.Spec.Gateway.Address; addr != "" {
@@ -122,6 +125,7 @@ func BuildService(server *dragonwildsv1alpha1.DragonwildsServer) *corev1.Service
 }
 
 // BuildDeployment creates the Recreate Deployment for the official image.
+// secretName is the credentials Secret; used for game env and optional server-manager sidecar.
 func BuildDeployment(server *dragonwildsv1alpha1.DragonwildsServer, configHash, secretName string) *appsv1.Deployment {
 	gamePort := config.GamePort(server.Spec)
 	beaconPort := config.BeaconPort(server.Spec)
@@ -180,36 +184,52 @@ func BuildDeployment(server *dragonwildsv1alpha1.DragonwildsServer, configHash, 
 	}
 
 	mountPath := config.MountPath(server.Spec)
+	containers := []corev1.Container{
+		{
+			Name:            "dragonwilds",
+			Image:           image,
+			ImagePullPolicy: pullPolicy,
+			Env:             env,
+			Ports: []corev1.ContainerPort{
+				{Name: "game", ContainerPort: gamePort, Protocol: corev1.ProtocolUDP},
+				{Name: "beacon", ContainerPort: beaconPort, Protocol: corev1.ProtocolUDP},
+			},
+			Resources: config.DefaultResources(server.Spec),
+			VolumeMounts: []corev1.VolumeMount{
+				{Name: "data", MountPath: mountPath},
+			},
+		},
+	}
+	volumes := []corev1.Volume{
+		{
+			Name: "data",
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: pvcName(server),
+				},
+			},
+		},
+	}
 	podSpec := corev1.PodSpec{
 		TerminationGracePeriodSeconds: &grace,
 		ImagePullSecrets:              server.Spec.ImagePullSecrets,
 		NodeSelector:                  server.Spec.NodeSelector,
-		Containers: []corev1.Container{
-			{
-				Name:            "dragonwilds",
-				Image:           image,
-				ImagePullPolicy: pullPolicy,
-				Env:             env,
-				Ports: []corev1.ContainerPort{
-					{Name: "game", ContainerPort: gamePort, Protocol: corev1.ProtocolUDP},
-					{Name: "beacon", ContainerPort: beaconPort, Protocol: corev1.ProtocolUDP},
-				},
-				Resources: config.DefaultResources(server.Spec),
-				VolumeMounts: []corev1.VolumeMount{
-					{Name: "data", MountPath: mountPath},
-				},
-			},
-		},
-		Volumes: []corev1.Volume{
-			{
-				Name: "data",
+		Containers:                    containers,
+		Volumes:                       volumes,
+	}
+	if server.Spec.ServerManager.Enabled {
+		podSpec.ServiceAccountName = serverManagerSAName(server)
+		podSpec.Containers = append(podSpec.Containers, serverManagerSidecar(server, secretName))
+		if server.Spec.Backup.Enabled {
+			podSpec.Volumes = append(podSpec.Volumes, corev1.Volume{
+				Name: "backups",
 				VolumeSource: corev1.VolumeSource{
 					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-						ClaimName: pvcName(server),
+						ClaimName: backupPVCName(server),
 					},
 				},
-			},
-		},
+			})
+		}
 	}
 
 	return &appsv1.Deployment{

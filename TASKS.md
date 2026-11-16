@@ -30,6 +30,7 @@
 - [x] Optional backup CronJob + backup PVC
 - [x] Controller metrics endpoint (Kubebuilder default)
 - [x] ServiceMonitor polish / scrape docs (`docs/METRICS.md`)
+- [x] Optional Server Manager admin UI sidecar (`docs/SERVER_MANAGER.md`)
 - [ ] Image digests / SBOM-ready publish (GHCR — optional later)
 
 ## Phase 5 — Launch

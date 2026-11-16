@@ -11,6 +11,8 @@ DragonwildsServer (CR)
 ├── Service         ({name})                  UDP game + beacon (LoadBalancer VIP recommended)
 ├── PVC             ({name}-backups)          optional tar archives (backup.enabled)
 ├── CronJob         ({name}-backup)           optional scheduled backup
+├── Sidecar         server-manager            optional admin UI (:8088 TCP on VIP)
+├── SA/Role/Binding ({name}-server-manager)   RBAC for UI → CR/Secret/restart/backup
 ├── Service         ({name}-envoy)            ClusterIP backend for UDPRoutes (Envoy only)
 └── Gateway         EnvoyProxy + UDPRoutes    optional — not recommended for Dragonwilds
 ```

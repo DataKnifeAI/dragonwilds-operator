@@ -116,6 +116,29 @@ type PersistenceConfig struct {
 	MountPath string `json:"mountPath,omitempty"`
 }
 
+// ServerManagerConfig is an optional authenticated admin UI sidecar on the
+// game pod. When enabled, TCP port (default 8088) is published on the same
+// Service as game UDP (LoadBalancer VIP:port). Basic auth uses username
+// "admin" and the admin-password Secret key.
+type ServerManagerConfig struct {
+	// Enabled starts the Server Manager sidecar and exposes its TCP port.
+	// Default false. Enabling Recreate-rolls the game Deployment.
+	// +optional
+	Enabled bool `json:"enabled,omitempty"`
+
+	// Port is the sidecar listen port (and Service TCP port). Default 8088.
+	// +kubebuilder:default=8088
+	// +kubebuilder:validation:Minimum=1024
+	// +kubebuilder:validation:Maximum=65535
+	// +optional
+	Port int32 `json:"port,omitempty"`
+
+	// Image is the container image that provides /server-manager (the operator
+	// image). Default: harbor.dataknife.net/library/dragonwilds-operator:latest
+	// +optional
+	Image string `json:"image,omitempty"`
+}
+
 // BackupConfig configures scheduled tar backups of the data PVC.
 type BackupConfig struct {
 	// Enabled creates a backup PVC + CronJob. Default false.
@@ -251,6 +274,10 @@ type DragonwildsServerSpec struct {
 	// +optional
 	Backup BackupConfig `json:"backup,omitempty"`
 
+	// ServerManager is an optional authenticated admin UI sidecar.
+	// +optional
+	ServerManager ServerManagerConfig `json:"serverManager,omitempty"`
+
 	// Resources overrides auto-selected CPU/memory.
 	// +optional
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
@@ -318,6 +345,14 @@ type DragonwildsServerStatus struct {
 	// can detect accidental new-world creation (palworld DedicatedServerName analogue).
 	// +optional
 	WorldSaveGuid string `json:"worldSaveGuid,omitempty"`
+
+	// ServerManagerAddress is the IP for the optional admin UI (usually the VIP).
+	// +optional
+	ServerManagerAddress string `json:"serverManagerAddress,omitempty"`
+
+	// ServerManagerPort is the TCP port for the optional admin UI.
+	// +optional
+	ServerManagerPort int32 `json:"serverManagerPort,omitempty"`
 
 	// ObservedGeneration is the last reconciled generation.
 	// +optional
