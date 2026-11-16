@@ -1,0 +1,4 @@
+## Append samples of your project ##
+resources:
+- dragonwilds_v1alpha1_dragonwildsserver.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples

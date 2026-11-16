@@ -1,0 +1,33 @@
+# Local Dragonwilds dedicated server (no Kubernetes).
+# Official Jagex image — see docs/LOCAL.md
+#
+#   cp .env.example .env   # set RSDW_OWNER_ID + passwords
+#   docker compose up -d
+#   docker compose down
+
+services:
+  rsdw-dedicated:
+    image: ${RSDW_IMAGE:-ghcr.io/runescape/rsdw-dedicated}
+    container_name: dragonwilds-local
+    restart: unless-stopped
+    stop_grace_period: 60s
+    ports:
+      # Host and container ports must match (official image requirement).
+      - "${GAME_PORT:-7777}:7777/udp"
+      - "${BEACON_PORT:-8888}:8888/udp"
+    environment:
+      RSDW_OWNER_ID: "${RSDW_OWNER_ID:?set RSDW_OWNER_ID in .env}"
+      RSDW_SERVER_NAME: "${RSDW_SERVER_NAME:-dragonwilds-local}"
+      RSDW_WORLD_NAME: "${RSDW_WORLD_NAME:-Homelab World}"
+      # Empty string = open world. Omitting this var makes the image pick "random".
+      RSDW_PASSWORD: "${RSDW_PASSWORD-}"
+      RSDW_ADMIN_PASSWORD: "${RSDW_ADMIN_PASSWORD:?set RSDW_ADMIN_PASSWORD in .env}"
+      RSDW_PORT: "${GAME_PORT:-7777}"
+      RSDW_BEACON_PORT: "${BEACON_PORT:-8888}"
+      RSDW_AUTO_STOP_ON_UPDATE: "${RSDW_AUTO_STOP_ON_UPDATE:-false}"
+      RSDW_LINE_BUFFERED_LOGS: "true"
+      STEAMAPPVALIDATE: "${STEAMAPPVALIDATE:-0}"
+    volumes:
+      - ./data:/home/steam/rsdw-dedicated
+    mem_limit: ${MEM_LIMIT:-8g}
+    cpus: ${CPU_LIMIT:-2.0}

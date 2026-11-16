@@ -1,0 +1,43 @@
+apiVersion: dragonwilds.dataknife.ai/v1alpha1
+kind: DragonwildsServer
+metadata:
+  labels:
+    app.kubernetes.io/name: dragonwilds-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: ashenfall-home
+spec:
+  # REQUIRED — RuneScape: Dragonwilds Player ID (Settings menu → copy)
+  ownerId: "REPLACE_WITH_PLAYER_ID"
+  serverName: "Ashenfall Home"
+  worldName: "Homelab World"
+  players: 6
+  gamePort: 7777
+  # beaconPort defaults to gamePort + 1111 (8888)
+
+  generateSecrets: true
+  # Open world (no join password). Omit and generateSecrets will create one.
+  allowEmptyWorldPassword: true
+
+  image: ghcr.io/runescape/rsdw-dedicated
+  # Prefer pinning a digest after first successful pull:
+  # imageTag: ""
+
+  update:
+    autoUpdateImage: false
+    validateOnStart: false
+
+  # Phase 3 will wire Envoy Gateway UDPRoutes. For now, disable and use NodePort:
+  gateway:
+    enabled: false
+    serviceType: NodePort
+    # enabled: true
+    # className: envoy
+    # address: "203.0.113.10"
+
+  persistence:
+    size: 20Gi
+    # storageClassName: ""
+    # mountPath: /home/steam/rsdw-dedicated
+
+  # resources: {}  # optional override of 2Gi+1Gi×players (min 4Gi)
+  terminationGracePeriodSeconds: 60
